@@ -5,7 +5,10 @@ set -e
 alembic upgrade head
 
 # 2. Crea el usuario inicial si INIT_USER_* están definidas y aún no existe.
-python -m app.crear_usuario --desde-entorno
+#    Un dato inválido aquí no debe tumbar la API: se avisa y se sigue.
+if ! python -m app.crear_usuario --desde-entorno; then
+    echo "AVISO: no se pudo crear el usuario inicial; revisa las variables INIT_USER_* (ver el error de arriba)." >&2
+fi
 
 # 3. API. --root-path /api porque nginx la publica bajo /api (así /api/docs funciona).
 exec uvicorn app.main:app \
