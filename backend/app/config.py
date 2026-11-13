@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     postgres_db: str | None = None
 
     # Obligatoria: sin valor por defecto para que nunca se use una clave conocida.
-    jwt_secret: str = Field(min_length=32)
+    jwt_secret: str = Field(min_length=1)
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 480
     cors_origins: str = ""

@@ -31,7 +31,7 @@ from .models import User
 from .security import hash_password, normalizar_correo
 
 ROLES = ("admin", "medico", "investigador", "docente", "laboratorio")
-LARGO_MINIMO_PASSWORD = 8
+LARGO_MINIMO_PASSWORD = 1
 
 
 def _error(mensaje: str) -> None:

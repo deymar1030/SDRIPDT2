@@ -19,7 +19,7 @@ python -m app.crear_usuario --correo tu@correo.bo --nombre "Tu Nombre" --rol adm
 uvicorn app.main:app --reload --port 8000
 ```
 
-`JWT_SECRET` es obligatoria (mínimo 32 caracteres); genera una con
+`JWT_SECRET` es obligatoria (no puede estar vacía; se recomienda una larga y aleatoria); genera una con
 `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
 
 No hay usuarios ni pacientes predefinidos: la base empieza vacía. El primer
