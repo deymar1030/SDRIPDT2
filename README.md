@@ -43,6 +43,22 @@ npm run dev
 Abrir http://localhost:5173 — el proxy de Vite reenvía `/api/*` al backend en
 el puerto 8000, así que ambos deben estar corriendo.
 
+## Pruebas
+
+```
+cd backend
+pip install -r requirements-dev.txt
+pytest
+```
+
+Las pruebas del backend usan una base SQLite temporal creada con las
+migraciones reales, así que no tocan la base de desarrollo. Cubren la
+clasificación clínica, el motor de simulación, la traducción de hábitos a
+efectos del modelo, la configuración, el script `crear_usuario` y toda la API
+(autenticación, seguridad, pacientes, escenarios, simulación, historial y
+riesgo). Dos pruebas están marcadas como fallo esperado (`xfail`): documentan
+la calibración clínica pendiente del motor y pasarán a verde cuando se recalibre.
+
 ## Despliegue con Docker (Coolify)
 
 `docker-compose.yml` levanta tres servicios: `db` (PostgreSQL 17, datos en

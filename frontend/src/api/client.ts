@@ -23,6 +23,53 @@ export function getToken() {
   return token;
 }
 
+const NOMBRES_CAMPO: Record<string, string> = {
+  nombre: "El nombre",
+  edad: "La edad",
+  sexo: "El sexo",
+  imc: "El IMC",
+  peso: "El peso",
+  talla: "La talla",
+  glucosa: "La glucosa",
+  insulina: "La insulina",
+  hba1c: "La HbA1c",
+  correo: "El correo",
+  password: "La contraseña",
+  nueva: "La nueva contraseña",
+};
+
+interface ErrorValidacion {
+  type?: string;
+  loc?: unknown[];
+  msg?: string;
+  ctx?: { ge?: number; le?: number; gt?: number; lt?: number; min_length?: number };
+}
+
+/** FastAPI devuelve `detail` como texto, o como lista de objetos cuando falla la
+ *  validación (422): se convierte a una frase legible en español. */
+function formatearDetalle(detalle: unknown, porDefecto: string): string {
+  if (typeof detalle === "string") return detalle;
+  if (!Array.isArray(detalle)) return porDefecto;
+
+  const frases = detalle.map((e: ErrorValidacion | string) => {
+    if (typeof e === "string") return e;
+    const campo = Array.isArray(e.loc) ? String(e.loc[e.loc.length - 1]) : "";
+    const sujeto = NOMBRES_CAMPO[campo] ?? (campo ? `El campo «${campo}»` : "El dato");
+    const c = e.ctx ?? {};
+    switch (e.type) {
+      case "greater_than_equal": return `${sujeto} debe ser al menos ${c.ge}`;
+      case "greater_than": return `${sujeto} debe ser mayor que ${c.gt}`;
+      case "less_than_equal": return `${sujeto} no puede ser mayor que ${c.le}`;
+      case "less_than": return `${sujeto} debe ser menor que ${c.lt}`;
+      case "missing": return `${sujeto} es obligatorio`;
+      case "string_too_short": return `${sujeto} es demasiado corto`;
+      case "value_error": return `${sujeto} no es válido`;
+      default: return `${sujeto} no es válido`;
+    }
+  });
+  return [...new Set(frases)].join(". ") + ".";
+}
+
 async function peticion<T>(ruta: string, opciones: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { ...(opciones.headers as Record<string, string>) };
   if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -35,7 +82,7 @@ async function peticion<T>(ruta: string, opciones: RequestInit = {}): Promise<T>
     let detalle = `Error ${resp.status}`;
     try {
       const data = await resp.json();
-      detalle = data.detail ?? detalle;
+      detalle = formatearDetalle(data.detail, detalle);
     } catch {
       /* respuesta sin cuerpo JSON */
     }

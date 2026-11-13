@@ -123,11 +123,11 @@ export default function PatientNew() {
 
         <Panel titulo="Antropometría">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Campo etiqueta="Peso (kg)" htmlFor="peso">
-              <Entrada id="peso" required type="number" step="0.1" value={peso} onChange={(e) => setPeso(e.target.value)} />
+            <Campo etiqueta="Peso (kg)" htmlFor="peso" ayuda="20 a 300 kg">
+              <Entrada id="peso" required type="number" step="0.1" min={20} max={300} value={peso} onChange={(e) => setPeso(e.target.value)} />
             </Campo>
-            <Campo etiqueta="Talla (cm)" htmlFor="talla">
-              <Entrada id="talla" required type="number" step="0.1" value={talla} onChange={(e) => setTalla(e.target.value)} />
+            <Campo etiqueta="Talla (cm)" htmlFor="talla" ayuda="100 a 230 cm">
+              <Entrada id="talla" required type="number" step="0.1" min={100} max={230} value={talla} onChange={(e) => setTalla(e.target.value)} />
             </Campo>
             <div className="flex items-end">
               <div className="w-full">
@@ -139,14 +139,14 @@ export default function PatientNew() {
 
         <Panel titulo="Laboratorio actual">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Campo etiqueta={<>Glucosa en ayunas <Unidad>(mg/dL)</Unidad></>} htmlFor="glucosa">
-              <Entrada id="glucosa" required type="number" value={glucosa} onChange={(e) => setGlucosa(e.target.value)} />
+            <Campo etiqueta={<>Glucosa en ayunas <Unidad>(mg/dL)</Unidad></>} htmlFor="glucosa" ayuda="Rango válido: 40 a 400">
+              <Entrada id="glucosa" required type="number" min={40} max={400} value={glucosa} onChange={(e) => setGlucosa(e.target.value)} />
             </Campo>
-            <Campo etiqueta={<>Insulina en ayunas <Unidad>(µU/mL)</Unidad></>} htmlFor="insulina">
-              <Entrada id="insulina" required type="number" step="0.1" value={insulina} onChange={(e) => setInsulina(e.target.value)} />
+            <Campo etiqueta={<>Insulina en ayunas <Unidad>(µU/mL)</Unidad></>} htmlFor="insulina" ayuda="Rango válido: 1 a 100">
+              <Entrada id="insulina" required type="number" step="0.1" min={1} max={100} value={insulina} onChange={(e) => setInsulina(e.target.value)} />
             </Campo>
-            <Campo etiqueta="HbA1c (%) · opcional" htmlFor="hba1c">
-              <Entrada id="hba1c" type="number" step="0.1" value={hba1c} onChange={(e) => setHba1c(e.target.value)} />
+            <Campo etiqueta="HbA1c (%) · opcional" htmlFor="hba1c" ayuda="Rango válido: 3 a 15">
+              <Entrada id="hba1c" type="number" step="0.1" min={3} max={15} value={hba1c} onChange={(e) => setHba1c(e.target.value)} />
             </Campo>
           </div>
           <div className="mt-4 sm:w-1/3">
