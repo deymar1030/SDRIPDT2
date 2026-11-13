@@ -18,16 +18,18 @@ const K = {
   I_SEC_MAX: 60,
   K_CAL: 7700,
   G_ACT_MAX: 3500,
-  K2: 0.00015,
-  K6: 0.005,
-  K6B: 0.0015,
-  K7: 0.06,
-  T_BETA_BASAL: 0.0005,
+  K2: 3.68e-6,
+  K6: 0.00483,
+  K6B: 2.09e-5,
+  K7: 0.00207,
+  T_BETA_BASAL: 3e-5,
+  C_BETA_DIABETES: 8.4,
+  MARGEN_C_BETA: 6.4,
   ALPHA_GEN: 1.4,
   THETA_UMB: 0.5,
   P_GEN: 0.35,
 };
-const PISO_C_BETA: Record<Etapa, number> = { sano: 70, resistencia: 55, prediabetes: 35, diabetes: 0 };
+const PISO_C_BETA: Record<Etapa, number> = { sano: 60, resistencia: 18.4, prediabetes: 11, diabetes: 0 };
 
 const clip = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
@@ -154,10 +156,11 @@ function CalculadoraEstadoInicial() {
     const cBetaBruta = deficit < 1 ? 100 : clip((100 * iSec0) / K.I_SEC_MAX, 5, 100);
     const homa = (g * i) / 405;
     const etapa = etapaClinica(g, a !== null && !Number.isNaN(a) ? a : null, homa);
-    const cBeta0 = Math.max(cBetaBruta, PISO_C_BETA[etapa]);
+    const piso = etapa === "diabetes" ? PISO_C_BETA[etapa] : Math.max(PISO_C_BETA[etapa], K.C_BETA_DIABETES + K.MARGEN_C_BETA);
+    const cBeta0 = Math.max(cBetaBruta, piso);
     const mAdip0 = clip((b - 22) * 2.5, 0, 80);
     const gAct = clip(1200 - (b - 22) * 40, 100, 1200);
-    return { iSec0, deficit, dIns0, sI0, cBetaBruta, cBeta0, homa, etapa, mAdip0, gAct, eCal: gAct / 7 };
+    return { iSec0, deficit, dIns0, sI0, cBetaBruta, cBeta0, piso, homa, etapa, mAdip0, gAct, eCal: gAct / 7 };
   }, [glucosa, insulina, imc, hba1c]);
 
   return (
@@ -188,7 +191,7 @@ function CalculadoraEstadoInicial() {
             <Resultado
               etiqueta={<><V s="β">C</V>(0) reserva pancreática</>}
               valor={`${r.cBeta0.toFixed(0)}%`}
-              nota={r.cBeta0 > r.cBetaBruta ? `bruto ${r.cBetaBruta.toFixed(0)}% → piso de la etapa ${PISO_C_BETA[r.etapa]}%` : r.deficit < 1 ? "sin déficit → reserva sana" : "100·I_sec / 60"}
+              nota={r.cBeta0 > r.cBetaBruta ? `bruto ${r.cBetaBruta.toFixed(0)}% → piso ${r.piso.toFixed(1)}%` : r.deficit < 1 ? "sin déficit → reserva sana" : "100·I_sec / 60"}
             />
             <Resultado etiqueta={<><V s="adip">M</V>(0) = (IMC − 22)·2.5</>} valor={`${r.mAdip0.toFixed(1)} kg`} nota="grasa acumulada sobre lo saludable" />
             <Resultado etiqueta={<>Línea base <V s="act">G</V> / <V s="cal">E</V></>} valor={`${r.gAct.toFixed(0)} / ${r.eCal.toFixed(0)}`} nota="kcal/semana · kcal/día" />
@@ -359,8 +362,8 @@ export default function ComoFunciona() {
             <Formula etiqueta="grasa"><V s="adip">M</V>(0) = (IMC − 22) · 2.5 kg</Formula>
             <p className="text-sm">
               La lógica: si hay glucosa de más es porque el páncreas ya está secretando todo lo que puede, así que la reserva se lee directamente de
-              la insulina medida. Como esa inversión puede dar reservas irrealmente bajas, se aplica un <b className="text-white">piso por etapa</b>:{" "}
-              sano 70 %, resistencia 55 %, prediabetes 35 %.
+              la insulina medida. Para no partir de reservas irrealmente bajas se aplica un <b className="text-white">piso por etapa</b>:{" "}
+              sano 60 %, resistencia 18.4 %, prediabetes 11 %; y quien hoy no es diabético nunca arranca por debajo de 14.8 % (el umbral de diabetes más un margen), para que una insulina baja no lo «diabetice» al instante (valores ajustados en la calibración).
             </p>
             <CalculadoraEstadoInicial />
           </Seccion>
@@ -368,13 +371,15 @@ export default function ComoFunciona() {
           {/* 3. Variables aleatorias */}
           <Seccion id="aleatorias" eyebrow="Paso 3" titulo="Las variables aleatorias">
             <p>
-              Son la fuente de incertidumbre del modelo. Se sortean de nuevo cada semana (excepto <V s="gen">P</V>, una vez por trayectoria):
+              Son la fuente de incertidumbre del modelo. <V s="cal">E</V> y <V s="act">G</V> se sortean de nuevo cada semana; <V s="β">T</V> y <V s="gen">P</V> se
+              sortean <b className="text-white">una sola vez por trayectoria</b>, porque son rasgos propios de cada persona (qué tan rápido se le desgasta el
+              páncreas, su herencia) y no cambian de una semana a otra:
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               {[
                 { tipo: "normal" as const, simbolo: <V s="cal">E</V>, nombre: "Ingesta calórica diaria", dist: "Normal(μ = E_base, σ = 100)", nota: "E_base = G_base / 7 kcal/día" },
                 { tipo: "uniforme" as const, simbolo: <V s="act">G</V>, nombre: "Gasto por actividad física semanal", dist: "Uniforme[G_base − 300, G_base + 300]", nota: "G_base = 1200 − 40·(IMC − 22) kcal/semana" },
-                { tipo: "gamma" as const, simbolo: <V s="β">T</V>, nombre: "Tasa de agotamiento de células β", dist: "Gamma(forma = 2, escala = 0.0015)", nota: "media ≈ 0.003 por semana" },
+                { tipo: "gamma" as const, simbolo: <V s="β">T</V>, nombre: "Tasa de agotamiento de células β", dist: "Gamma(forma = 2, escala = 0.00011)", nota: "media ≈ 0.00022 por semana · una vez por trayectoria" },
                 { tipo: "bernoulli" as const, simbolo: <V s="gen">P</V>, nombre: "Predisposición genética", dist: "Bernoulli(p = 0.35)", nota: "o fijo 0/1 si se conoce el antecedente" },
               ].map((v) => (
                 <div key={v.nombre} className="flex gap-4 rounded-xl border border-hud-borde bg-hud-panel/80 p-4 shadow-[var(--sombra-panel)]">
@@ -410,7 +415,7 @@ export default function ComoFunciona() {
               ]}
             />
             <Formula etiqueta="dosis de R7">
-              dosis = ½ · min(1, kcal/día ÷ 500) + ½ · min(1, MET·min/semana ÷ 600) ; k<sub>7,efectivo</sub> = 0.06 · dosis
+              dosis = ½ · min(1, kcal/día ÷ 500) + ½ · min(1, MET·min/semana ÷ 600) ; k<sub>7,efectivo</sub> = 0.00207 · dosis
             </Formula>
             <p className="text-sm">
               500 kcal/día es el déficit de referencia de la práctica clínica (≈ 0.5 kg por semana) y 600 MET·min/semana el umbral de actividad de la OMS.
@@ -442,26 +447,32 @@ export default function ComoFunciona() {
               </div>
               <div>
                 <h3 className="font-semibold text-white">c) R6 · Glucotoxicidad (si G &gt; 100)</h3>
-                <Formula><V s="β">T</V> ← <V s="β">T</V> · (1 + 0.005 · (G − 100)) ; <V s="I">S</V> ← <V s="I">S</V> · (1 − 0.0015)</Formula>
+                <Formula><V s="β">T</V> ← <V s="β">T</V> · (1 + 0.00483 · (G − 100)) ; <V s="I">S</V> ← <V s="I">S</V> · (1 − 0.0000209)</Formula>
               </div>
               <div>
                 <h3 className="font-semibold text-white">d) R4 · Agotamiento de células β</h3>
                 <Formula etiqueta={`si S_I < θ = ${K.THETA_UMB}`}><V s="β">C</V> ← <V s="β">C</V> − 100 · <V s="β">T</V> · (1 + (α − 1) · <V s="gen">P</V>) , α = 1.4</Formula>
-                <Formula etiqueta="si no"><V s="β">C</V> ← <V s="β">C</V> − 100 · 0.0005</Formula>
+                <Formula etiqueta="si no"><V s="β">C</V> ← <V s="β">C</V> − 100 · 0.00003</Formula>
                 <p className="text-sm">Con sensibilidad baja el páncreas está sobrecargado y se desgasta mucho más rápido; con antecedente familiar, un 40 % más.</p>
               </div>
               <div>
                 <h3 className="font-semibold text-white">e) R2 · Resistencia periférica inducida por grasa</h3>
-                <Formula><V s="I">S</V> ← <V s="I">S</V> − 0.00015 · <V s="adip">M</V> · (1 − <V s="act">G</V> / 3500) · (1 + (α − 1) · <V s="gen">P</V>)</Formula>
+                <Formula><V s="I">S</V> ← <V s="I">S</V> − 0.00000368 · <V s="adip">M</V> · (1 − <V s="act">G</V> / 3500) · (1 + (α − 1) · <V s="gen">P</V>)</Formula>
                 <p className="text-sm">Más grasa → más resistencia; más actividad física → menos efecto.</p>
               </div>
               <div>
                 <h3 className="font-semibold text-white">f) R7 · Recuperación por intervención</h3>
-                <Formula etiqueta="solo con intervención"><V s="I">S</V> ← <V s="I">S</V> + 0.06 · dosis · (1 − <V s="I">S</V>)</Formula>
+                <Formula etiqueta="solo con intervención"><V s="I">S</V> ← <V s="I">S</V> + 0.00207 · dosis · (1 − <V s="I">S</V>)</Formula>
               </div>
               <div>
                 <h3 className="font-semibold text-white">g) R1 · Lipogénesis</h3>
-                <Formula etiqueta="7700 kcal = 1 kg"><V s="adip">M</V> ← <V s="adip">M</V> + max(0, <V s="neto">B</V>) / 7700 <span className="text-hud-tenue">(con intervención: + <V s="neto">B</V> / 7700)</span></Formula>
+                <Formula etiqueta="7700 kcal = 1 kg"><V s="adip">M</V> ← <V s="adip">M</V> + [ 0.30 · <V s="neto">B</V> + 186 · (<V s="adip">M</V><sub>0</sub> − <V s="adip">M</V>) ] / 7700</Formula>
+                <p className="text-sm">
+                  La grasa sube y baja con el balance real (el documento original solo acumulaba superávit, lo que engordaba a todos por igual). Solo el 30 % del
+                  balance calculado se convierte en grasa, y un término de <b className="text-white">adaptación metabólica</b> (186 kcal/semana por kg) hace que al
+                  adelgazar el cuerpo gaste menos: el peso se estabiliza en un nuevo equilibrio en vez de caer sin límite, y si se abandona el plan vuelve hacia su
+                  nivel de partida <V s="adip">M</V><sub>0</sub>.
+                </p>
               </div>
               <div>
                 <h3 className="font-semibold text-white">h) R5 · Punto de inflexión</h3>
@@ -485,7 +496,7 @@ export default function ComoFunciona() {
                   ["sano", "ninguno de los siguientes", "ninguno de los siguientes"],
                   ["resistencia", "HOMA-IR ≥ 2.5", "1 / S_I ≥ 2.5"],
                   ["prediabetes", "Glucosa ≥ 100 o HbA1c ≥ 5.7", "G ≥ 100"],
-                  ["diabetes", "Glucosa ≥ 126 o HbA1c ≥ 6.5", "G ≥ 126 o C_β ≤ 30 %"],
+                  ["diabetes", "Glucosa ≥ 126 o HbA1c ≥ 6.5", "G ≥ 126 o C_β ≤ 8.4 %"],
                 ] as [Etapa, string, string][]
               ).map(([e, hoy, modelo]) => [
                 <span key={e} className="font-semibold" style={{ color: tinta(COLOR_ETAPA[e]) }}>{{ sano: "Sano", resistencia: "Resistencia", prediabetes: "Prediabetes", diabetes: "Diabetes tipo 2" }[e]}</span>,
@@ -540,14 +551,26 @@ export default function ComoFunciona() {
                 ["α_gen", "1.4", "Penalización genética (rango 1.2–1.6)", "Documento (punto medio)"],
                 ["θ_umb", "0.5", "Umbral de sobrecarga pancreática (rango 0.4–0.6)", "Documento (punto medio)"],
                 ["D_ins,basal", "6.0", "Demanda de insulina con sensibilidad normal", "Calibración"],
-                ["k2", "0.00015", "Resistencia inducida por grasa", "Calibración"],
+                ["k2", "0.00000368", "Resistencia inducida por grasa", "Calibración"],
                 ["k5", "1.5", "mg/dL de glucosa por µU/mL de déficit", "Calibración"],
-                ["k6 · k6b", "0.005 · 0.0015", "Glucotoxicidad sobre T_β y S_I", "Calibración"],
-                ["k7", "0.06", "Recuperación semanal por intervención (× dosis)", "Calibración"],
+                ["k6 · k6b", "0.00483 · 0.0000209", "Glucotoxicidad sobre T_β y S_I", "Calibración"],
+                ["k7", "0.00207", "Recuperación semanal por intervención (× dosis)", "Calibración"],
                 ["MET", "3.5 · 6 · 8.5", "Caminar · bicicleta/trote · correr", "Compendium of Physical Activities"],
-                ["T_β,basal", "0.0005", "Desgaste β sin sobrecarga", "Calibración"],
+                ["T_β,basal", "0.00003", "Desgaste β sin sobrecarga", "Calibración"],
+                ["T_β", "Gamma(2; 0.00011)", "Tasa de agotamiento β, una vez por trayectoria", "Calibración"],
+                ["Eficiencia del balance", "0.30", "Fracción del balance energético que se vuelve grasa", "Calibración"],
+                ["Adaptación metabólica", "186 kcal/sem·kg", "Cierra el déficit al adelgazar; recupera al abandonar", "Calibración"],
+                ["Deriva sin cambios", "27.6 kcal/sem", "Superávit medio del escenario «sin cambios»", "Calibración"],
+                ["C_β diabetes", "8.4 %", "Reserva β bajo la cual el modelo declara diabetes", "Calibración"],
+                ["Pisos de C_β", "60 · 18.4 · 11 %", "Reserva mínima inicial: sano · resistencia · prediabetes", "Calibración"],
+                ["Margen de reserva", "6.4 puntos", "Mínimo sobre el umbral de diabetes al arrancar sin ser diabético", "Calibración"],
               ]}
             />
+            <p className="text-sm">
+              Las constantes marcadas como «Calibración» se ajustaron con una búsqueda automática para que 7 pacientes tipo reproduzcan incidencias de diabetes a
+              5 años del orden de las publicadas (por ejemplo, el <i>Diabetes Prevention Program</i>: ≈ 11 casos por 100 personas-año con placebo y ≈ −58 % con
+              estilo de vida intensivo) y un comportamiento del peso creíble. Es un ajuste a rangos de la literatura, no una validación con datos locales.
+            </p>
           </Seccion>
 
           {/* 9. Limitaciones */}
@@ -556,9 +579,10 @@ export default function ComoFunciona() {
               <TriangleAlert size={20} className="mt-0.5 flex-shrink-0 text-amber-300" />
               <div className="space-y-2 text-sm">
                 <p><b className="text-amber-200">Es un pronóstico con incertidumbre, no un diagnóstico.</b> Sirve para conversar con el paciente sobre escenarios, no para decidir un tratamiento.</p>
-                <p>Las constantes marcadas como “Calibración” son provisionales: aún no están validadas con datos de SNIS-VE, SEDES La Paz o la IDF.</p>
+                <p>Las constantes se ajustaron a rangos publicados en la literatura; todavía no se validaron con datos locales de SNIS-VE, SEDES La Paz o la IDF, así que los números son orientativos.</p>
                 <p>La actividad y la ingesta de referencia se derivan del IMC porque el registro todavía no recoge esos datos directamente.</p>
-                <p>En pacientes que ya están en prediabetes la calibración actual tiende a sobrestimar la progresión, incluso con intervención.</p>
+                <p>El modelo supone que el plan se cumple mientras dura: no incluye adherencia parcial ni abandono gradual. Con intervención, la glucosa mediana de quienes no progresan vuelve a valores normales, lo que puede ser optimista.</p>
+                <p>La hipertensión, el tabaquismo y el sexo se registran pero todavía no intervienen en el cálculo.</p>
               </div>
             </div>
           </Seccion>

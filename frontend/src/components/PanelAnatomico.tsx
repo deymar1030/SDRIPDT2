@@ -178,7 +178,7 @@ export function PanelAnatomico({ estado, momento, escaneando = false, children }
   const nHoma = nivelAscendente(estado.homaIR, [2.5, 4, 6]);
   const nImc = nivelAscendente(estado.imc, [25, 30, 35]);
   const nHba1c = estado.hba1c != null ? nivelAscendente(estado.hba1c, [5.7, 6.0, 6.5]) : 0;
-  const nReserva = nivelDescendente(estado.reserva, [70, 45, 30]);
+  const nReserva = nivelDescendente(estado.reserva, [70, 40, 20]);
   const nSensibilidad = nivelDescendente(estado.sensibilidad, [0.4, 0.25, 0.15]);
   const nAdiposo = nivelAscendente(estado.adiposo, [7.5, 20, 30]);
   const nEtapa = ORDEN_ETAPAS.indexOf(estado.etapa);

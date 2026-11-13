@@ -106,9 +106,13 @@ En desarrollo local se puede seguir usando SQLite (`DATABASE_URL` en
 
 - Administración de usuarios desde la app (hoy se crean con
   `app.crear_usuario` o con el registro público).
-- Calibración numérica de las reglas R1–R7: los valores de k2, k5, k6, k7,
-  etc. son un primer ajuste razonable, no una calibración validada contra
-  datos reales de SNIS-VE/SEDES La Paz/IDF — algunos perfiles clínicos
-  (ej. pacientes ya en resistencia/prediabetes) todavía muestran poca
-  diferencia entre "sin cambios" e "intervención intensiva"; el documento
-  mismo deja esta calibración como trabajo pendiente.
+- Validación del modelo con datos locales (SNIS-VE / SEDES La Paz / IDF).
+  Las constantes de las reglas R1–R7 se ajustaron con
+  `backend/calibracion/calibrar.py` a rangos publicados en la literatura
+  (Diabetes Prevention Program, ADA): 7 pacientes tipo reproducen incidencias
+  a 5 años del orden de las reportadas, con un efecto de la intervención y un
+  comportamiento del peso creíbles, y las pruebas de `backend/tests` cuidan
+  esas cifras. Es un ajuste a rangos publicados, **no** una validación con
+  datos de la población de La Paz; los resultados son orientativos.
+- Adherencia parcial a la intervención y uso de hipertensión, tabaquismo y
+  sexo en el cálculo (hoy se registran pero no intervienen).

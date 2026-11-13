@@ -11,17 +11,28 @@ y las M trayectorias difieren entre sí únicamente por el camino aleatorio que
 toman hacia adelante (E_cal, G_act, T_β, y el factor genético si se
 desconoce).
 
-Supuestos de calibración NO fijados por el documento original (que los deja
-como pendientes de "Objetivo Específico 2") y que aquí se fijan de forma
-explícita y documentada, a falta de datos de SNIS-VE/SEDES La Paz/IDF:
+Calibración. El documento deja las constantes pendientes ("Objetivo
+Específico 2"). Aquí se ajustaron con una búsqueda automática
+(backend/calibracion/calibrar.py) para que 7 pacientes tipo reproduzcan
+rangos de incidencia a 5 años tomados de la literatura (órdenes de magnitud
+del Diabetes Prevention Program: placebo ≈ 11 casos/100 persona-años, estilo
+de vida intensivo ≈ −58 %; ADA: prediabetes 5–10 %/año), además de un
+comportamiento del peso creíble (la intervención baja ~3–7 kg y se
+estabiliza; sin cambios el peso no se mueve). NO están validadas con datos
+locales de SNIS-VE/SEDES La Paz/IDF: son un ajuste a rangos publicados.
 
+Tres decisiones estructurales (además de las constantes), todas documentadas
+en el lugar donde se aplican:
+- T_β se sortea UNA vez por trayectoria (rasgo individual), no cada semana:
+  sorteado semanalmente se promediaba y todos los resultados salían 0 % o 100 %.
+- R1 deja de acumular solo el superávit (max(0,·)) y añade eficiencia del
+  balance y adaptación metabólica: el peso sube y baja y se estabiliza.
+- El umbral de reserva β para declarar diabetes (C_BETA_DIABETES) y los pisos
+  por etapa del estado inicial (PISO_C_BETA) son parámetros ajustados.
+
+Otros supuestos fijos:
 - D_INS_BASAL=6.0, I_SEC_MAX=60.0 (dado), G_ACT_MAX=3500 (dado como rango).
 - Escenarios configurables (comida/ejercicio/calendario): ver intervencion.py.
-- k2, k5, k6, k6b, k7, T_BETA_BASAL: elegidos para que la progresión completa
-  (Sano → Resistencia → Prediabetes → DMT2) tome, en un paciente con
-  sobrepeso moderado y sedentarismo, un orden de magnitud de años-a-décadas,
-  consistente con la fisiopatología descrita en el documento.
-- T_β ~ Gamma(shape=2, scale=0.0015) (media≈0.003, dentro de [0.0001,0.015]).
 - α_gen fijo en 1.4 (punto medio del rango [1.20,1.60] dado).
 - Línea base de E_cal/G_act por paciente: se deriva de su IMC actual (no hay
   variable de dieta/actividad en el formulario de registro todavía), y queda
@@ -50,15 +61,22 @@ ALPHA_GEN = 1.4         # punto medio de [1.20, 1.60]
 THETA_UMB = 0.5         # punto medio de [0.40, 0.60]
 
 # ---------------- Supuestos de calibración (no dados por el documento) ----------------
+# Valores ajustados por búsqueda automática contra rangos publicados (ver
+# "Calibración" en el docstring del módulo y backend/calibracion/).
 D_INS_BASAL = 6.0
-K2 = 0.00015
+K2 = 3.68e-06
 K5 = 1.5
-K6 = 0.005
-K6B = 0.0015
-K7 = 0.06
-T_BETA_BASAL = 0.0005
+K6 = 0.00483
+K6B = 2.09e-05               # quedó en el borde inferior del rango de búsqueda: este término casi no hace falta
+K7 = 0.00207
+T_BETA_BASAL = 3.0e-05
 GAMMA_SHAPE = 2.0
-GAMMA_SCALE = 0.0015
+GAMMA_SCALE = 1.1e-04        # T_β ~ Gamma(2, escala): media ≈ 2.2e-4 por semana, sorteada una vez por trayectoria
+EFICIENCIA_BALANCE = 0.30    # fracción del balance energético que se convierte en grasa (ver R1)
+DERIVA_KCAL_SEMANA = 27.6    # superávit semanal medio del "sin cambios" (aumento de peso típico del adulto)
+C_BETA_DIABETES = 8.4        # reserva β (%) por debajo de la cual el modelo declara diabetes
+MARGEN_C_BETA = 6.4          # puntos de reserva por encima de ese umbral con los que arranca quien hoy no es diabético
+ADAPTACION_KCAL_KG = 186.0   # kcal/semana de adaptación metabólica por kg de grasa perdido o ganado (ver R1)
 
 INTERVENCION = {
     "nula": {"d_ecal": 0.0, "d_gact": 0.0},
@@ -96,7 +114,7 @@ def estimar_estado_inicial(glucosa: float, insulina: float, imc: float) -> tuple
     return s_i0, c_beta0, m_adip0
 
 
-PISO_C_BETA = {"sano": 70.0, "resistencia": 55.0, "prediabetes": 35.0, "diabetes": 0.0}
+PISO_C_BETA = {"sano": 60.0, "resistencia": 18.4, "prediabetes": 11.0, "diabetes": 0.0}
 
 
 def estado_inicial_completo(glucosa: float, insulina: float, imc: float, hba1c: float | None) -> dict:
@@ -113,6 +131,11 @@ def estado_inicial_completo(glucosa: float, insulina: float, imc: float, hba1c: 
     homa_ir_hoy = (glucosa * insulina) / 405.0
     etapa_hoy = clasificar_etapa_clinica(glucosa, hba1c, homa_ir_hoy)
     c_beta0 = max(c_beta0, PISO_C_BETA[etapa_hoy])
+    if etapa_hoy != "diabetes":
+        # Quien hoy no es diabético no puede arrancar pegado al umbral de reserva
+        # con el que el modelo declara diabetes: con insulina baja, la inversión
+        # da reservas muy bajas y el paciente "se diabetizaría" casi de inmediato.
+        c_beta0 = max(c_beta0, C_BETA_DIABETES + MARGEN_C_BETA)
     return {"sI0": s_i0, "cBeta0": c_beta0, "mAdip0": m_adip0, "etapa": etapa_hoy, "homaIR": homa_ir_hoy}
 
 
@@ -122,7 +145,7 @@ def calcular_supuestos(imc: float, antecedente_familiar: bool | None) -> dict:
     simulación usará para ESTE paciente — para que se puedan ver en la UI,
     no solo en el código."""
     g_act_base = float(np.clip(1200.0 - (imc - 22.0) * 40.0, 100.0, 1200.0))
-    e_cal_base = g_act_base / 7.0
+    e_cal_base = (g_act_base + DERIVA_KCAL_SEMANA) / 7.0
     lo, hi = max(0.0, g_act_base - 300.0), min(3500.0, g_act_base + 300.0)
 
     if antecedente_familiar is None:
@@ -137,7 +160,7 @@ def calcular_supuestos(imc: float, antecedente_familiar: bool | None) -> dict:
             {"simbolo": "G_act", "nombre": "Gasto metabólico semanal por actividad física",
              "distribucion": "Uniforme", "parametros": f"[{lo:.0f}, {hi:.0f}] kcal/semana"},
             {"simbolo": "T_β", "nombre": "Tasa de agotamiento de células beta",
-             "distribucion": "Gamma", "parametros": f"forma={GAMMA_SHAPE}, escala={GAMMA_SCALE} (media≈0.003/semana)"},
+             "distribucion": "Gamma", "parametros": f"forma={GAMMA_SHAPE}, escala={GAMMA_SCALE} (media≈{GAMMA_SHAPE * GAMMA_SCALE:.2g}/semana; una vez por trayectoria)"},
             {"simbolo": "P_gen", "nombre": "Predisposición genética hereditaria",
              "distribucion": "Bernoulli" if antecedente_familiar is None else "Fijo (dato conocido)",
              "parametros": p_gen_desc},
@@ -148,6 +171,9 @@ def calcular_supuestos(imc: float, antecedente_familiar: bool | None) -> dict:
             "k7 (recuperación por intervención)": K7, "T_β basal": T_BETA_BASAL,
             "α_gen (penalización genética)": ALPHA_GEN, "θ_umb (umbral de sobrecarga)": THETA_UMB,
             "D_ins_basal": D_INS_BASAL, "I_sec_max": I_SEC_MAX,
+            "Eficiencia del balance energético": EFICIENCIA_BALANCE,
+            "Adaptación metabólica (kcal/sem por kg)": ADAPTACION_KCAL_KG,
+            "Reserva β que declara diabetes (%)": C_BETA_DIABETES,
         },
         "basalPaciente": {"eCalBase": round(e_cal_base, 1), "gActBase": round(g_act_base, 1)},
     }
@@ -157,7 +183,7 @@ def _clasificar(g_ayunas: np.ndarray, c_beta: np.ndarray, r_homa: np.ndarray) ->
     etapas = np.full(g_ayunas.shape, "sano", dtype=object)
     etapas[r_homa >= 2.5] = "resistencia"
     etapas[g_ayunas >= GAMMA_PRED] = "prediabetes"
-    etapas[(g_ayunas >= GAMMA_DMT2) | (c_beta <= 30.0)] = "diabetes"
+    etapas[(g_ayunas >= GAMMA_DMT2) | (c_beta <= C_BETA_DIABETES)] = "diabetes"
     return etapas
 
 
@@ -201,6 +227,13 @@ def simular_paciente(
     else:
         P_gen = np.full(M, 1.0 if antecedente_familiar else 0.0)
 
+    # T_β ~ Gamma, UNA VEZ por trayectoria: la velocidad a la que se desgasta
+    # el páncreas es un rasgo individual y persistente. Sorteada de nuevo cada
+    # semana se promediaba a lo largo de las ~260 semanas, todas las
+    # trayectorias se desgastaban igual y el resultado salía siempre 0 % o
+    # 100 % (sin zona intermedia), sin importar el valor de las constantes.
+    T_beta_individual = np.clip(rng.gamma(GAMMA_SHAPE, GAMMA_SCALE, M), 0.0001, 0.015)
+
     # Línea base para el escenario "sin cambios": balance energético ≈ 0
     # (7·E_cal_base ≈ G_act_base), para que "mantener el hábito actual" no
     # implique, por construcción, una tendencia sistemática a subir o bajar
@@ -209,7 +242,7 @@ def simular_paciente(
     # (más bajo cuanto mayor el IMC actual), ya que no se recoge todavía un
     # dato de actividad física real en el registro del paciente.
     g_act_base = float(np.clip(1200.0 - (imc - 22.0) * 40.0, 100.0, 1200.0))
-    e_cal_base = g_act_base / 7.0
+    e_cal_base = (g_act_base + DERIVA_KCAL_SEMANA) / 7.0
 
     if intervencion is None:
         activa = nivel_intervencion in ("moderada", "intensiva")
@@ -283,10 +316,10 @@ def simular_paciente(
         # R3 / observables de este paso, con S_I y C_β vigentes (t)
         D_ins, I_sec, G_ayunas, R_homa = calcular_observables(S_I, C_beta)
 
-        # T_β ~ Gamma, y R6: retroalimentación por glucotoxicidad
-        T_beta = np.clip(rng.gamma(GAMMA_SHAPE, GAMMA_SCALE, M), 0.0001, 0.015)
+        # R6: retroalimentación por glucotoxicidad sobre la tasa T_β propia de
+        # cada trayectoria (sorteada una vez, arriba).
         mask_glucotox = G_ayunas > GAMMA_PRED
-        T_beta = np.where(mask_glucotox, T_beta * (1.0 + K6 * (G_ayunas - GAMMA_PRED)), T_beta)
+        T_beta = np.where(mask_glucotox, T_beta_individual * (1.0 + K6 * (G_ayunas - GAMMA_PRED)), T_beta_individual)
         S_I = np.where(mask_glucotox, S_I * (1.0 - K6B), S_I)
 
         # R4: agotamiento de células beta
@@ -299,14 +332,21 @@ def simular_paciente(
         # R7: recuperación parcial por intervención preventiva
         S_I = np.where(aplica_interv, np.clip(S_I + k7_efectivo * (1.0 - S_I), 0.05, 1.5), S_I)
 
-        # R1: lipogénesis por superávit energético. El documento original solo
-        # acumula superávit (max(0,·), nunca reduce con déficit), lo cual es
-        # razonable para el escenario "sin cambios" (fluctuación pasiva), pero
-        # bajo intervención activa (dieta + ejercicio sostenidos) la masa
-        # grasa SÍ puede reducirse con un balance negativo real — es una
-        # extensión deliberada sobre R1, no está en el documento original.
-        incremento_adip = np.where(aplica_interv, b_neto, np.maximum(0.0, b_neto))
-        M_adip = np.clip(M_adip + incremento_adip / K_CAL, 0.0, 80.0)
+        # R1: lipogénesis. Dos extensiones deliberadas sobre el documento:
+        # (a) El documento solo acumula superávit (max(0,·)). Como B_neto se
+        #     sortea cada semana con media ≈ 0, descartar los déficits induce
+        #     un aumento de peso sistemático ficticio (~2 kg/año) incluso en
+        #     "sin cambios", que empuja a todos los pacientes a la diabetes.
+        #     Aquí la grasa puede subir y bajar con el balance real.
+        # (b) EFICIENCIA_BALANCE < 1: solo una fracción del balance calculado
+        #     se convierte en grasa (reposición de hambre, termogénesis).
+        # (c) Adaptación metabólica: al perder grasa el cuerpo gasta menos
+        #     energía, así que el déficit se cierra solo y el peso se
+        #     estabiliza en un nuevo equilibrio (en vez de caer sin límite);
+        #     si se abandona la intervención, la grasa vuelve hacia su nivel
+        #     de partida. Es una fuerza restauradora hacia la grasa inicial.
+        b_efectivo = EFICIENCIA_BALANCE * b_neto + ADAPTACION_KCAL_KG * (m_adip0 - M_adip)
+        M_adip = np.clip(M_adip + b_efectivo / K_CAL, 0.0, 80.0)
 
         # R5: punto de inflexión (se evalúa con los observables de ESTE paso)
         etapas = _clasificar(G_ayunas, C_beta, R_homa)

@@ -134,8 +134,9 @@ function SeccionTerminos() {
           <h3 className="mb-1 font-semibold text-white">Sobre el modelo</h3>
           <p className="text-hud-suave">
             El motor de pronóstico implementa un modelo de dinámica de sistemas en tiempo discreto (componentes A–D,
-            reglas R1–R7). Varias de sus constantes de calibración son provisionales — todavía no están validadas contra
-            datos reales de SNIS-VE, SEDES La Paz o la IDF — tal como lo deja pendiente el documento formal del modelo.
+            reglas R1–R7). Sus constantes se calibraron contra rangos publicados en la literatura (por ejemplo, la
+            incidencia de diabetes del Diabetes Prevention Program); todavía no se validaron con datos locales de
+            SNIS-VE, SEDES La Paz o la IDF, por lo que los resultados son orientativos.
           </p>
         </section>
 

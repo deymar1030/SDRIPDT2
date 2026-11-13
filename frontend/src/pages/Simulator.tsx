@@ -484,8 +484,9 @@ export default function Simulator() {
                   </div>
                 </div>
                 <p className="mt-4 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-200">
-                  Estas constantes son una calibración provisional interna (no todavía validada contra datos reales de
-                  SNIS-VE/SEDES La Paz/IDF), tal como lo deja pendiente el documento formal del modelo.
+                  Las constantes se calibraron contra rangos publicados en la literatura (p. ej., el Diabetes Prevention
+                  Program); todavía no se validaron con datos locales de SNIS-VE / SEDES La Paz / IDF. Los resultados son
+                  pronósticos orientativos con incertidumbre, no diagnósticos.
                 </p>
               </details>
             </>
