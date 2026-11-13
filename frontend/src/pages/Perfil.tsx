@@ -6,6 +6,7 @@ import { DoctorBadge } from "../components/DoctorBadge";
 import { Aviso, Boton, Campo, Entrada, Panel } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../api/client";
+import { ROL_ETIQUETA } from "../lib/roles";
 
 const SECCIONES = [
   { valor: "datos", etiqueta: "Datos personales", icono: UserCog },
@@ -13,13 +14,6 @@ const SECCIONES = [
   { valor: "terminos", etiqueta: "Términos de uso", icono: FileText },
 ] as const;
 
-const ROLES: Record<string, string> = {
-  medico: "Médico/a tratante",
-  investigador: "Investigador/a",
-  docente: "Docente",
-  laboratorio: "Laboratorio clínico",
-  admin: "Administrador/a",
-};
 
 function SeccionDatos() {
   const { usuario, actualizarUsuario } = useAuth();
@@ -54,7 +48,7 @@ function SeccionDatos() {
           <Entrada id="correo" required type="email" value={correo} onChange={(e) => setCorreo(e.target.value)} />
         </Campo>
         <Campo etiqueta="Rol" htmlFor="rol" ayuda="El rol lo asigna la administración del sistema.">
-          <Entrada id="rol" disabled value={ROLES[usuario?.rol ?? ""] ?? usuario?.rol ?? ""} />
+          <Entrada id="rol" disabled value={usuario ? ROL_ETIQUETA[usuario.rol] ?? usuario.rol : ""} />
         </Campo>
         {mensaje && <Aviso tipo="exito">{mensaje}</Aviso>}
         {error && <Aviso tipo="error">{error}</Aviso>}
@@ -185,7 +179,7 @@ export default function Perfil() {
                 <p className="mt-3 font-semibold text-white">{usuario.nombre}</p>
                 <p className="text-xs text-hud-tenue">{usuario.correo}</p>
                 <span className="mt-2 rounded-full border border-hud-borde-fuerte bg-hud-acento/10 px-2.5 py-0.5 text-xs text-cyan-200">
-                  {ROLES[usuario.rol] ?? usuario.rol}
+                  {ROL_ETIQUETA[usuario.rol] ?? usuario.rol}
                 </span>
               </div>
             </Panel>

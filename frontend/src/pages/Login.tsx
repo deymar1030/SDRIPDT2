@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { LogIn } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { AuthLayout } from "../components/AuthLayout";
 import { Aviso, Boton, Campo, Entrada } from "../components/ui";
+import { inicioPorRol } from "../lib/roles";
 
 export default function Login() {
   const { iniciarSesion } = useAuth();
@@ -18,8 +19,8 @@ export default function Login() {
     setError(null);
     setCargando(true);
     try {
-      await iniciarSesion(correo, password);
-      navigate("/dashboard");
+      const usuario = await iniciarSesion(correo, password);
+      navigate(inicioPorRol(usuario));
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo iniciar sesión");
     } finally {
@@ -44,11 +45,8 @@ export default function Login() {
         </Boton>
       </form>
 
-      <p className="mt-6 text-center text-sm text-hud-suave">
-        ¿No tienes cuenta?{" "}
-        <Link to="/registro" className="font-semibold text-hud-acento hover:text-cyan-300">
-          Crear cuenta
-        </Link>
+      <p className="mt-6 text-center text-sm text-hud-tenue">
+        ¿No tienes cuenta? Las cuentas las crea el administrador del sistema.
       </p>
     </AuthLayout>
   );

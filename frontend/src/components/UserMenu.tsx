@@ -3,14 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { ChevronDown, FileText, KeyRound, LogOut, UserCog } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { DoctorBadge } from "./DoctorBadge";
+import { ROL_ETIQUETA } from "../lib/roles";
 
-const ROLES: Record<string, string> = {
-  medico: "Médico/a tratante",
-  investigador: "Investigador/a",
-  docente: "Docente",
-  laboratorio: "Laboratorio clínico",
-  admin: "Administrador/a",
-};
 
 export function UserMenu() {
   const { usuario, cerrarSesion } = useAuth();
@@ -52,7 +46,7 @@ export function UserMenu() {
       >
         <div className="hidden text-right leading-tight sm:block">
           <p className="text-sm font-semibold text-white">{usuario.nombre}</p>
-          <p className="text-xs text-hud-tenue">{ROLES[usuario.rol] ?? usuario.rol}</p>
+          <p className="text-xs text-hud-tenue">{ROL_ETIQUETA[usuario.rol] ?? usuario.rol}</p>
         </div>
         <DoctorBadge size={36} />
         <ChevronDown size={15} className={`text-hud-suave transition-transform ${abierto ? "rotate-180" : ""}`} />

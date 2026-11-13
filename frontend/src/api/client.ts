@@ -1,6 +1,8 @@
 import type {
+  CambiosUsuario,
   DatosEscenario,
   Escenario,
+  NuevoUsuario,
   NuevoPaciente,
   Paciente,
   PacienteRiesgo,
@@ -103,11 +105,17 @@ export const api = {
     });
   },
 
-  async registrar(nombre: string, correo: string, password: string, rol: string) {
-    return peticion<{ access_token: string; usuario: Usuario }>("/auth/registro", {
-      method: "POST",
-      body: JSON.stringify({ nombre, correo, password, rol }),
-    });
+  // --- Administración de cuentas (solo admin) ---
+  async listarUsuarios() {
+    return peticion<Usuario[]>("/usuarios");
+  },
+
+  async crearUsuario(datos: NuevoUsuario) {
+    return peticion<Usuario>("/usuarios", { method: "POST", body: JSON.stringify(datos) });
+  },
+
+  async actualizarUsuario(id: number, cambios: CambiosUsuario) {
+    return peticion<Usuario>(`/usuarios/${id}`, { method: "PATCH", body: JSON.stringify(cambios) });
   },
 
   async yo() {

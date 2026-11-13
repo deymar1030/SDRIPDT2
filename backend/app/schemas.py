@@ -9,16 +9,24 @@ Etapa = Literal["sano", "resistencia", "prediabetes", "diabetes"]
 
 
 # ---------------- Auth / Usuarios ----------------
-class UserCreate(BaseModel):
-    nombre: str
+Rol = Literal["admin", "medico"]
+
+
+class UsuarioCrear(BaseModel):
+    """Alta de una cuenta por un admin. No hay registro público."""
+    nombre: str = Field(min_length=1, max_length=120)
     correo: EmailStr
     password: str = Field(min_length=6)
-    rol: str = "medico"
+    rol: Rol = "medico"
 
 
-class UserLogin(BaseModel):
-    correo: EmailStr
-    password: str
+class UsuarioActualizar(BaseModel):
+    """Cambios de un admin sobre una cuenta; solo se aplican los campos enviados."""
+    nombre: str | None = Field(default=None, min_length=1, max_length=120)
+    correo: EmailStr | None = None
+    rol: Rol | None = None
+    activo: bool | None = None
+    password: str | None = Field(default=None, min_length=6)   # restablecer contraseña
 
 
 class UserOut(BaseModel):
@@ -27,6 +35,7 @@ class UserOut(BaseModel):
     nombre: str
     correo: str
     rol: str
+    activo: bool = True
     creado_en: dt.datetime
 
 

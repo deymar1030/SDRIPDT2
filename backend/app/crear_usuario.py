@@ -30,7 +30,7 @@ from .database import SessionLocal, engine
 from .models import User
 from .security import hash_password, normalizar_correo
 
-ROLES = ("admin", "medico", "investigador", "docente", "laboratorio")
+ROLES = ("admin", "medico")
 LARGO_MINIMO_PASSWORD = 1
 
 

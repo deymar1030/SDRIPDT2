@@ -26,6 +26,12 @@ PACIENTE_BASE = {
 }
 
 
+def cabeceras(cliente, correo, password):
+    r = cliente.post("/auth/login", data={"username": correo, "password": password})
+    assert r.status_code == 200, r.text
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+
 @pytest.fixture(scope="session")
 def cliente():
     cfg = Config(str(BACKEND / "alembic.ini"))
@@ -38,11 +44,29 @@ def cliente():
 
 
 @pytest.fixture(scope="session")
-def auth(cliente):
-    """Cabeceras de un usuario ya registrado."""
-    r = cliente.post("/auth/registro", json={"nombre": "Doctora Prueba", "correo": "doctora@prueba.bo", "password": "clave-prueba", "rol": "medico"})
+def admin_auth(cliente):
+    """Cabeceras del primer admin, creado como en un despliegue real: con el script crear_usuario."""
+    from app.crear_usuario import crear_usuario
+
+    assert crear_usuario("admin@prueba.bo", "Admin de Prueba", "clave-admin", "admin") == "creado"
+    return cabeceras(cliente, "admin@prueba.bo", "clave-admin")
+
+
+@pytest.fixture(scope="session")
+def crear_cuenta(cliente, admin_auth):
+    """Crea una cuenta desde el admin (la única forma de crear cuentas) y devuelve la respuesta."""
+    def _crear(nombre, correo, password="clave-prueba", rol="medico"):
+        return cliente.post("/usuarios", json={"nombre": nombre, "correo": correo, "password": password, "rol": rol}, headers=admin_auth)
+
+    return _crear
+
+
+@pytest.fixture(scope="session")
+def auth(cliente, crear_cuenta):
+    """Cabeceras de un médico (la usuaria 'doctora')."""
+    r = crear_cuenta("Doctora Prueba", "doctora@prueba.bo", "clave-prueba", "medico")
     assert r.status_code == 201, r.text
-    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+    return cabeceras(cliente, "doctora@prueba.bo", "clave-prueba")
 
 
 @pytest.fixture

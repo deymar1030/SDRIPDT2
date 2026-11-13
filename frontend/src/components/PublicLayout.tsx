@@ -5,6 +5,7 @@ import { Marca } from "./Shell";
 import { BotonEnlace } from "./ui";
 import { BotonTema } from "../tema/TemaContext";
 import { useAuth } from "../auth/AuthContext";
+import { inicioPorRol } from "../lib/roles";
 
 const ENLACES = [
   { to: "/", etiqueta: "Inicio", ancla: false },
@@ -33,12 +34,11 @@ export function PublicLayout({ children }: { children: ReactNode }) {
     `rounded-lg px-3 py-2 text-sm font-medium transition-colors ${activo ? "text-white" : "text-hud-suave hover:text-white"}`;
 
   const acciones = usuario ? (
-    <BotonEnlace to="/dashboard" tamano="sm" icono={<LayoutDashboard size={14} />}>Ir al panel</BotonEnlace>
+    <BotonEnlace to={inicioPorRol(usuario)} tamano="sm" icono={<LayoutDashboard size={14} />}>
+      {usuario.rol === "admin" ? "Ir a usuarios" : "Ir al panel"}
+    </BotonEnlace>
   ) : (
-    <>
-      <BotonEnlace to="/login" variante="fantasma" tamano="sm" icono={<LogIn size={14} />}>Ingresar</BotonEnlace>
-      <BotonEnlace to="/registro" tamano="sm">Crear cuenta</BotonEnlace>
-    </>
+    <BotonEnlace to="/login" tamano="sm" icono={<LogIn size={14} />}>Ingresar</BotonEnlace>
   );
 
   return (
@@ -120,7 +120,7 @@ export function PublicLayout({ children }: { children: ReactNode }) {
               <li><Link to="/#caracteristicas" className="text-hud-suave hover:text-hud-acento">Características</Link></li>
               <li><Link to="/#flujo" className="text-hud-suave hover:text-hud-acento">Flujo de trabajo</Link></li>
               <li><Link to="/como-funciona" className="text-hud-suave hover:text-hud-acento">Cómo funciona la simulación</Link></li>
-              <li><Link to={usuario ? "/dashboard" : "/login"} className="text-hud-suave hover:text-hud-acento">{usuario ? "Ir al panel" : "Ingresar"}</Link></li>
+              <li><Link to={usuario ? inicioPorRol(usuario) : "/login"} className="text-hud-suave hover:text-hud-acento">{usuario ? "Ir al panel" : "Ingresar"}</Link></li>
             </ul>
           </div>
           <div>

@@ -9,25 +9,7 @@ from ..security import create_access_token, get_current_user, hash_password, nor
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/registro", response_model=schemas.Token, status_code=status.HTTP_201_CREATED)
-def registrar(datos: schemas.UserCreate, db: Session = Depends(get_db)):
-    correo = normalizar_correo(datos.correo)
-    existe = db.query(models.User).filter(models.User.correo == correo).first()
-    if existe:
-        raise HTTPException(status_code=400, detail="Ya existe una cuenta con ese correo")
-
-    usuario = models.User(
-        nombre=datos.nombre,
-        correo=correo,
-        password_hash=hash_password(datos.password),
-        rol=datos.rol,
-    )
-    db.add(usuario)
-    db.commit()
-    db.refresh(usuario)
-
-    token = create_access_token(usuario.id)
-    return schemas.Token(access_token=token, usuario=usuario)
+# No hay registro público: las cuentas las crea un admin (routers/usuarios.py).
 
 
 @router.post("/login", response_model=schemas.Token)
@@ -35,6 +17,9 @@ def iniciar_sesion(form: OAuth2PasswordRequestForm = Depends(), db: Session = De
     usuario = db.query(models.User).filter(models.User.correo == normalizar_correo(form.username)).first()
     if not usuario or not verify_password(form.password, usuario.password_hash):
         raise HTTPException(status_code=401, detail="Correo o contraseña incorrectos")
+    if not usuario.activo:
+        # Se revela solo después de acertar la contraseña, para no confirmar que el correo existe.
+        raise HTTPException(status_code=403, detail="Tu cuenta está desactivada. Contacta al administrador.")
 
     token = create_access_token(usuario.id)
     return schemas.Token(access_token=token, usuario=usuario)

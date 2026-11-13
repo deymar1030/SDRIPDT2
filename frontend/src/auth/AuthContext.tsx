@@ -5,8 +5,7 @@ import type { Usuario } from "../types";
 interface AuthState {
   usuario: Usuario | null;
   cargando: boolean;
-  iniciarSesion: (correo: string, password: string) => Promise<void>;
-  registrar: (nombre: string, correo: string, password: string, rol: string) => Promise<void>;
+  iniciarSesion: (correo: string, password: string) => Promise<Usuario>;
   cerrarSesion: () => void;
   actualizarUsuario: (u: Usuario) => void;
 }
@@ -33,12 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { access_token, usuario } = await api.login(correo, password);
     setToken(access_token);
     setUsuario(usuario);
-  }, []);
-
-  const registrar = useCallback(async (nombre: string, correo: string, password: string, rol: string) => {
-    const { access_token, usuario } = await api.registrar(nombre, correo, password, rol);
-    setToken(access_token);
-    setUsuario(usuario);
+    return usuario;
   }, []);
 
   const cerrarSesion = useCallback(() => {
@@ -47,7 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ usuario, cargando, iniciarSesion, registrar, cerrarSesion, actualizarUsuario: setUsuario }}>
+    <AuthContext.Provider value={{ usuario, cargando, iniciarSesion, cerrarSesion, actualizarUsuario: setUsuario }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,6 +1,6 @@
 import datetime as dt
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -13,7 +13,9 @@ class User(Base):
     nombre: Mapped[str] = mapped_column(String(120))
     correo: Mapped[str] = mapped_column(String(160), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(200))
-    rol: Mapped[str] = mapped_column(String(30), default="medico")
+    rol: Mapped[str] = mapped_column(String(30), default="medico")  # admin | medico
+    # Las cuentas no se borran (los pacientes registran quién los creó): se desactivan.
+    activo: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
     creado_en: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow)
 
     pacientes: Mapped[list["Patient"]] = relationship(back_populates="creado_por")

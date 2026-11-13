@@ -4,6 +4,7 @@ import { PublicLayout } from "../components/PublicLayout";
 import { COLOR_ETAPA, StageBadge } from "../components/StageBadge";
 import { BotonEnlace, Campo, Entrada, Unidad, tinta } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
+import { inicioPorRol } from "../lib/roles";
 import type { Etapa } from "../types";
 
 /* =====================================================================
@@ -592,8 +593,8 @@ export default function ComoFunciona() {
               <p className="font-semibold text-white">Ahora míralo en acción</p>
               <p className="text-sm text-hud-suave">Registra a un paciente y compara sus escenarios en el simulador.</p>
             </div>
-            <BotonEnlace to={usuario ? "/simulador" : "/login"} icono={<FlaskConical size={16} />}>
-              {usuario ? "Abrir el simulador" : "Ingresar para simular"}
+            <BotonEnlace to={usuario?.rol === "medico" ? "/simulador" : usuario ? inicioPorRol(usuario) : "/login"} icono={<FlaskConical size={16} />}>
+              {usuario?.rol === "medico" ? "Abrir el simulador" : usuario ? "Ir a usuarios" : "Ingresar para simular"}
             </BotonEnlace>
           </div>
         </article>

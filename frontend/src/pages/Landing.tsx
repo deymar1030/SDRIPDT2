@@ -16,6 +16,7 @@ import { SiluetaHolografica } from "../components/SiluetaHolografica";
 import { COLOR_ETAPA } from "../components/StageBadge";
 import { BotonEnlace, tinta } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
+import { inicioPorRol } from "../lib/roles";
 
 /* ---------------- piezas pequeñas ---------------- */
 
@@ -79,7 +80,8 @@ const PASOS = [
 
 export default function Landing() {
   const { usuario } = useAuth();
-  const destinoPrincipal = usuario ? "/simulador" : "/registro";
+  const medico = usuario?.rol === "medico";
+  const destinoPrincipal = medico ? "/simulador" : usuario ? inicioPorRol(usuario) : "/login";
 
   return (
     <PublicLayout>
@@ -100,7 +102,7 @@ export default function Landing() {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <BotonEnlace to={destinoPrincipal} icono={<FlaskConical size={16} />}>
-                {usuario ? "Abrir el simulador" : "Comenzar ahora"}
+                {medico ? "Abrir el simulador" : usuario ? "Ir a usuarios" : "Ingresar"}
               </BotonEnlace>
               <BotonEnlace to="/como-funciona" variante="secundario" icono={<Sigma size={16} />}>
                 Cómo funciona la simulación
@@ -299,13 +301,12 @@ export default function Landing() {
         <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-6 px-4 py-14 sm:px-6 md:flex-row md:items-center">
           <div>
             <h2 className="text-2xl font-bold text-white">¿Listo para simular tu primer pronóstico?</h2>
-            <p className="mt-1 text-hud-suave">Registra a tu paciente con sus laboratorios de hoy y compara sus escenarios en minutos.</p>
+            <p className="mt-1 text-hud-suave">Registra a tu paciente con sus laboratorios de hoy y compara sus escenarios en minutos. Las cuentas las crea el administrador.</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <BotonEnlace to={destinoPrincipal} icono={<FlaskConical size={16} />}>
-              {usuario ? "Abrir el simulador" : "Crear cuenta"}
+              {medico ? "Abrir el simulador" : usuario ? "Ir a usuarios" : "Ingresar"}
             </BotonEnlace>
-            {!usuario && <BotonEnlace to="/login" variante="secundario">Ya tengo cuenta</BotonEnlace>}
           </div>
         </div>
       </section>

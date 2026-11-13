@@ -6,7 +6,7 @@ from ..clinical import calcular_homa_ir, clasificar_etapa_clinica
 from ..database import get_db
 from ..engine import calcular_supuestos, estado_inicial_completo, simular_paciente
 from ..intervencion import peso_del_paciente, resolver_intervencion
-from ..security import get_current_user
+from ..security import requiere_medico
 
 router = APIRouter(prefix="/pacientes", tags=["pacientes"])
 
@@ -27,25 +27,32 @@ def _a_patient_out(p: models.Patient) -> schemas.PatientOut:
     )
 
 
-def _obtener_paciente_o_404(paciente_id: int, db: Session) -> models.Patient:
+def _obtener_paciente_o_404(paciente_id: int, db: Session, usuario: models.User) -> models.Patient:
+    """Cada médico accede solo a los pacientes que registró él. Si el paciente es de
+    otro médico se responde 404 (no 403) para no revelar que existe."""
     paciente = db.get(models.Patient, paciente_id)
-    if paciente is None:
+    if paciente is None or paciente.creado_por_id != usuario.id:
         raise HTTPException(status_code=404, detail="Paciente no encontrado")
     return paciente
 
 
 @router.get("", response_model=list[schemas.PatientOut])
-def listar_pacientes(db: Session = Depends(get_db), _=Depends(get_current_user)):
-    pacientes = db.query(models.Patient).order_by(models.Patient.creado_en.desc()).all()
+def listar_pacientes(db: Session = Depends(get_db), usuario: models.User = Depends(requiere_medico)):
+    pacientes = (
+        db.query(models.Patient)
+        .filter(models.Patient.creado_por_id == usuario.id)
+        .order_by(models.Patient.creado_en.desc())
+        .all()
+    )
     return [_a_patient_out(p) for p in pacientes]
 
 
 @router.get("/riesgo", response_model=list[schemas.PacienteRiesgo])
-def listar_pacientes_riesgo(db: Session = Depends(get_db), _=Depends(get_current_user)):
+def listar_pacientes_riesgo(db: Session = Depends(get_db), usuario: models.User = Depends(requiere_medico)):
     """Todos los pacientes ordenados por probabilidad de diabetes a 5 años
     (según su última simulación del escenario 'sin cambios', si existe),
     para priorizar a quién contactar primero."""
-    pacientes = db.query(models.Patient).all()
+    pacientes = db.query(models.Patient).filter(models.Patient.creado_por_id == usuario.id).all()
     filas: list[schemas.PacienteRiesgo] = []
     for p in pacientes:
         homa = calcular_homa_ir(p.glucosa, p.insulina)
@@ -75,7 +82,7 @@ def listar_pacientes_riesgo(db: Session = Depends(get_db), _=Depends(get_current
 def crear_paciente(
     datos: schemas.PatientCreate,
     db: Session = Depends(get_db),
-    usuario: models.User = Depends(get_current_user),
+    usuario: models.User = Depends(requiere_medico),
 ):
     paciente = models.Patient(**datos.model_dump(), creado_por_id=usuario.id)
     db.add(paciente)
@@ -85,13 +92,13 @@ def crear_paciente(
 
 
 @router.get("/{paciente_id}", response_model=schemas.PatientOut)
-def obtener_paciente(paciente_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
-    return _a_patient_out(_obtener_paciente_o_404(paciente_id, db))
+def obtener_paciente(paciente_id: int, db: Session = Depends(get_db), usuario: models.User = Depends(requiere_medico)):
+    return _a_patient_out(_obtener_paciente_o_404(paciente_id, db, usuario))
 
 
 @router.get("/{paciente_id}/escenarios", response_model=list[schemas.ScenarioOut])
-def listar_escenarios(paciente_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
-    _obtener_paciente_o_404(paciente_id, db)
+def listar_escenarios(paciente_id: int, db: Session = Depends(get_db), usuario: models.User = Depends(requiere_medico)):
+    _obtener_paciente_o_404(paciente_id, db, usuario)
     return (
         db.query(models.Scenario)
         .filter(models.Scenario.paciente_id == paciente_id)
@@ -105,9 +112,9 @@ def crear_escenario(
     paciente_id: int,
     datos: schemas.ScenarioCreate,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    usuario: models.User = Depends(requiere_medico),
 ):
-    _obtener_paciente_o_404(paciente_id, db)
+    _obtener_paciente_o_404(paciente_id, db, usuario)
     escenario = models.Scenario(paciente_id=paciente_id, **datos.model_dump())
     db.add(escenario)
     db.commit()
@@ -121,8 +128,9 @@ def actualizar_escenario(
     escenario_id: int,
     datos: schemas.ScenarioCreate,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    usuario: models.User = Depends(requiere_medico),
 ):
+    _obtener_paciente_o_404(paciente_id, db, usuario)
     escenario = db.get(models.Scenario, escenario_id)
     if escenario is None or escenario.paciente_id != paciente_id:
         raise HTTPException(status_code=404, detail="Escenario no encontrado")
@@ -139,8 +147,9 @@ def eliminar_escenario(
     paciente_id: int,
     escenario_id: int,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    usuario: models.User = Depends(requiere_medico),
 ):
+    _obtener_paciente_o_404(paciente_id, db, usuario)
     escenario = db.get(models.Scenario, escenario_id)
     if escenario is None or escenario.paciente_id != paciente_id:
         raise HTTPException(status_code=404, detail="Escenario no encontrado")
@@ -154,9 +163,9 @@ def simular(
     paciente_id: int,
     datos: schemas.SimulateRequest,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    usuario: models.User = Depends(requiere_medico),
 ):
-    paciente = _obtener_paciente_o_404(paciente_id, db)
+    paciente = _obtener_paciente_o_404(paciente_id, db, usuario)
 
     query = db.query(models.Scenario).filter(models.Scenario.paciente_id == paciente_id)
     if datos.escenario_ids:
@@ -211,8 +220,8 @@ def simular(
 
 
 @router.get("/{paciente_id}/simulaciones", response_model=list[schemas.SimulationRunSummary])
-def listar_simulaciones(paciente_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
-    _obtener_paciente_o_404(paciente_id, db)
+def listar_simulaciones(paciente_id: int, db: Session = Depends(get_db), usuario: models.User = Depends(requiere_medico)):
+    _obtener_paciente_o_404(paciente_id, db, usuario)
     corridas = (
         db.query(models.SimulationRun)
         .filter(models.SimulationRun.paciente_id == paciente_id)
@@ -229,7 +238,8 @@ def listar_simulaciones(paciente_id: int, db: Session = Depends(get_db), _=Depen
 
 
 @router.get("/{paciente_id}/simulaciones/{run_id}", response_model=schemas.SimulateResponse)
-def obtener_simulacion(paciente_id: int, run_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def obtener_simulacion(paciente_id: int, run_id: int, db: Session = Depends(get_db), usuario: models.User = Depends(requiere_medico)):
+    _obtener_paciente_o_404(paciente_id, db, usuario)
     corrida = db.get(models.SimulationRun, run_id)
     if corrida is None or corrida.paciente_id != paciente_id:
         raise HTTPException(status_code=404, detail="Simulación no encontrada")

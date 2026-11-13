@@ -46,6 +46,20 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         raise credenciales_invalidas
 
     user = db.get(User, user_id)
-    if user is None:
+    # Una cuenta desactivada deja de funcionar al instante, aunque su token siga vigente.
+    if user is None or not user.activo:
         raise credenciales_invalidas
     return user
+
+
+def requiere_rol(*roles: str):
+    """Dependencia de FastAPI: exige sesión y que el usuario tenga uno de los roles."""
+    def dependencia(usuario: User = Depends(get_current_user)) -> User:
+        if usuario.rol not in roles:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permiso para esta acción")
+        return usuario
+    return dependencia
+
+
+requiere_admin = requiere_rol("admin")      # gestiona cuentas; no ve datos de pacientes
+requiere_medico = requiere_rol("medico")    # registra y ve sus propios pacientes

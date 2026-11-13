@@ -6,6 +6,8 @@ import datetime as dt
 import jwt
 import pytest
 
+from tests.conftest import PACIENTE_BASE, cabeceras
+
 from app.config import settings
 
 # ============================================================== autenticación
@@ -17,28 +19,10 @@ def test_salud(cliente):
     assert cliente.get("/salud").json() == {"estado": "ok"}
 
 
-def test_registro_devuelve_token_y_no_expone_la_contrasena(cliente):
-    r = cliente.post("/auth/registro", json={"nombre": "Ana", "correo": "Ana.Perez@Hospital.BO", "password": "secreto123", "rol": "medico"})
-    assert r.status_code == 201
-    cuerpo = r.json()
-    assert cuerpo["access_token"] and cuerpo["usuario"]["correo"] == "ana.perez@hospital.bo"   # normalizado a minúsculas
-    assert "password" not in str(cuerpo).lower() or "password_hash" not in cuerpo["usuario"]
-    assert "password_hash" not in cuerpo["usuario"]
-
-
-def test_registro_rechaza_correo_duplicado_sin_importar_mayusculas(cliente):
-    cliente.post("/auth/registro", json={"nombre": "Beto", "correo": "beto@hospital.bo", "password": "secreto123"})
-    r = cliente.post("/auth/registro", json={"nombre": "Otro", "correo": "BETO@hospital.bo", "password": "secreto123"})
-    assert r.status_code == 400
-
-
-@pytest.mark.parametrize("cuerpo", [
-    {"nombre": "X", "correo": "no-es-correo", "password": "secreto123"},
-    {"nombre": "X", "correo": "x@y.bo", "password": "123"},          # contraseña demasiado corta
-    {"nombre": "X", "correo": "x@y.bo"},                              # falta la contraseña
-])
-def test_registro_valida_los_datos(cliente, cuerpo):
-    assert cliente.post("/auth/registro", json=cuerpo).status_code == 422
+def test_no_existe_el_registro_publico(cliente):
+    r = cliente.post("/auth/registro", json={"nombre": "Intruso", "correo": "intruso@x.bo", "password": "secreto123", "rol": "admin"})
+    assert r.status_code in (404, 405)
+    assert _login(cliente, "intruso@x.bo", "secreto123").status_code == 401        # no se creó ninguna cuenta
 
 
 def test_login_correcto_y_correo_en_mayusculas(cliente, auth):
@@ -53,24 +37,27 @@ def test_login_con_clave_o_usuario_incorrectos(cliente, auth):
 
 def test_yo_devuelve_el_usuario_de_la_sesion(cliente, auth):
     r = cliente.get("/auth/yo", headers=auth)
-    assert r.status_code == 200 and r.json()["correo"] == "doctora@prueba.bo"
+    u = r.json()
+    assert r.status_code == 200 and u["correo"] == "doctora@prueba.bo" and u["rol"] == "medico" and u["activo"] is True
+    assert "password_hash" not in u and "password" not in u
 
 
-def test_editar_perfil(cliente):
-    tok = cliente.post("/auth/registro", json={"nombre": "Perfil", "correo": "perfil@prueba.bo", "password": "secreto123"}).json()["access_token"]
-    h = {"Authorization": f"Bearer {tok}"}
+def test_editar_perfil(cliente, crear_cuenta):
+    crear_cuenta("Perfil", "perfil@prueba.bo", "secreto123")
+    h = cabeceras(cliente, "perfil@prueba.bo", "secreto123")
     r = cliente.patch("/auth/perfil", json={"nombre": "Perfil Nuevo", "correo": "Perfil.Nuevo@prueba.bo"}, headers=h)
     assert r.status_code == 200 and r.json()["nombre"] == "Perfil Nuevo" and r.json()["correo"] == "perfil.nuevo@prueba.bo"
 
 
-def test_editar_perfil_no_permite_tomar_el_correo_de_otro(cliente, auth):
-    r = cliente.patch("/auth/perfil", json={"nombre": "Doctora", "correo": "beto@hospital.bo"}, headers=auth)
+def test_editar_perfil_no_permite_tomar_el_correo_de_otro(cliente, auth, crear_cuenta):
+    crear_cuenta("Beto Perfil", "beto.perfil@hospital.bo", "secreto123")
+    r = cliente.patch("/auth/perfil", json={"nombre": "Doctora", "correo": "beto.perfil@hospital.bo"}, headers=auth)
     assert r.status_code == 400
 
 
-def test_cambiar_contrasena(cliente):
-    tok = cliente.post("/auth/registro", json={"nombre": "Clave", "correo": "clave@prueba.bo", "password": "vieja-clave"}).json()["access_token"]
-    h = {"Authorization": f"Bearer {tok}"}
+def test_cambiar_contrasena(cliente, crear_cuenta):
+    crear_cuenta("Clave", "clave@prueba.bo", "vieja-clave")
+    h = cabeceras(cliente, "clave@prueba.bo", "vieja-clave")
     assert cliente.post("/auth/password", json={"actual": "incorrecta", "nueva": "nueva-clave"}, headers=h).status_code == 400
     assert cliente.post("/auth/password", json={"actual": "vieja-clave", "nueva": "nueva-clave"}, headers=h).status_code == 204
     assert _login(cliente, "clave@prueba.bo", "vieja-clave").status_code == 401
@@ -83,6 +70,7 @@ RUTAS_PROTEGIDAS = [
     ("GET", "/pacientes/1/escenarios"), ("POST", "/pacientes/1/escenarios"), ("PUT", "/pacientes/1/escenarios/1"),
     ("DELETE", "/pacientes/1/escenarios/1"), ("POST", "/pacientes/1/simular"), ("GET", "/pacientes/1/simulaciones"),
     ("GET", "/pacientes/1/simulaciones/1"), ("GET", "/auth/yo"), ("PATCH", "/auth/perfil"), ("POST", "/auth/password"),
+    ("GET", "/usuarios"), ("POST", "/usuarios"), ("PATCH", "/usuarios/1"),
 ]
 
 
@@ -127,8 +115,6 @@ def test_paciente_se_clasifica_al_registrarse(crear_paciente, glucosa, insulina,
     ("edad", 0), ("edad", 111), ("imc", 11), ("imc", 71), ("peso", 19), ("peso", 301), ("talla", 99), ("talla", 231),
 ])
 def test_paciente_rechaza_valores_fuera_de_rango(cliente, auth, campo, valor):
-    from tests.conftest import PACIENTE_BASE
-
     r = cliente.post("/pacientes", json={**PACIENTE_BASE, campo: valor}, headers=auth)
     assert r.status_code == 422
     assert r.json()["detail"][0]["loc"][-1] == campo
@@ -321,3 +307,133 @@ def test_riesgo_ordena_por_probabilidad_y_deja_al_final_a_los_no_simulados(clien
     por_nombre = {f["nombre"]: f for f in filas}
     assert por_nombre["R-Riesgo"]["ultimaSimulacion"]["prob5"] > por_nombre["R-Sano"]["ultimaSimulacion"]["prob5"]
     assert por_nombre["R-SinSimular"]["ultimaSimulacion"] is None and nuevo["id"] == por_nombre["R-SinSimular"]["id"]
+
+
+# ============================================================== administración de cuentas y roles
+def test_el_admin_crea_cuentas_y_el_correo_se_normaliza(crear_cuenta):
+    r = crear_cuenta("Ana Pérez", "Ana.Perez@Hospital.BO", "secreto123", "medico")
+    u = r.json()
+    assert r.status_code == 201 and u["correo"] == "ana.perez@hospital.bo" and u["rol"] == "medico" and u["activo"] is True
+    assert "password" not in u and "password_hash" not in u
+
+
+def test_correo_duplicado_sin_importar_mayusculas(crear_cuenta):
+    assert crear_cuenta("Beto", "beto@hospital.bo").status_code == 201
+    assert crear_cuenta("Otro", "BETO@hospital.bo").status_code == 400
+
+
+@pytest.mark.parametrize("cuerpo", [
+    {"nombre": "X", "correo": "no-es-correo", "password": "secreto123"},
+    {"nombre": "X", "correo": "x@y.bo", "password": "123"},                          # contraseña demasiado corta
+    {"nombre": "X", "correo": "x@y.bo"},                                              # falta la contraseña
+    {"nombre": "", "correo": "x@y.bo", "password": "secreto123"},                    # nombre vacío
+    {"nombre": "X", "correo": "x@y.bo", "password": "secreto123", "rol": "paciente"},     # los pacientes no son usuarios
+    {"nombre": "X", "correo": "x@y.bo", "password": "secreto123", "rol": "investigador"},  # roles retirados
+])
+def test_crear_cuenta_valida_los_datos(cliente, admin_auth, cuerpo):
+    assert cliente.post("/usuarios", json=cuerpo, headers=admin_auth).status_code == 422
+
+
+def test_el_admin_lista_las_cuentas(cliente, admin_auth, auth):
+    filas = cliente.get("/usuarios", headers=admin_auth).json()
+    correos = {f["correo"]: f for f in filas}
+    assert correos["admin@prueba.bo"]["rol"] == "admin" and correos["doctora@prueba.bo"]["rol"] == "medico"
+    assert all("password_hash" not in f for f in filas)
+
+
+def test_un_medico_no_puede_administrar_cuentas(cliente, auth):
+    assert cliente.get("/usuarios", headers=auth).status_code == 403
+    assert cliente.post("/usuarios", json={"nombre": "X", "correo": "x@y.bo", "password": "secreto123", "rol": "admin"}, headers=auth).status_code == 403
+    assert cliente.patch("/usuarios/1", json={"rol": "admin"}, headers=auth).status_code == 403
+
+
+def test_el_admin_no_ve_datos_de_pacientes(cliente, admin_auth, crear_paciente):
+    p = crear_paciente(nombre="Reservado al médico")
+    base = f"/pacientes/{p['id']}"
+    intentos = [
+        ("GET", "/pacientes", None), ("GET", "/pacientes/riesgo", None), ("POST", "/pacientes", PACIENTE_BASE),
+        ("GET", base, None), ("GET", base + "/escenarios", None), ("POST", base + "/escenarios", {"nombre": "X", "nivel_intervencion": "nula"}),
+        ("POST", base + "/simular", {}), ("GET", base + "/simulaciones", None), ("GET", base + "/simulaciones/1", None),
+    ]
+    for metodo, ruta, cuerpo in intentos:
+        assert cliente.request(metodo, ruta, json=cuerpo, headers=admin_auth).status_code == 403, (metodo, ruta)
+
+
+def test_cada_medico_ve_solo_sus_pacientes(cliente, auth, crear_paciente, crear_cuenta):
+    mio = crear_paciente(nombre="Paciente de la doctora")
+    esc = cliente.post(f"/pacientes/{mio['id']}/escenarios", json={"nombre": "Sin cambios", "nivel_intervencion": "nula"}, headers=auth).json()
+    run = cliente.post(f"/pacientes/{mio['id']}/simular", json={"horizonte_anios": 2, "trayectorias": 50}, headers=auth).json()["runId"]
+
+    crear_cuenta("Dr. Otro", "otro.medico@prueba.bo", "clave-otro")
+    otro = cabeceras(cliente, "otro.medico@prueba.bo", "clave-otro")
+
+    assert mio["id"] not in [p["id"] for p in cliente.get("/pacientes", headers=otro).json()]
+    assert mio["id"] not in [f["id"] for f in cliente.get("/pacientes/riesgo", headers=otro).json()]
+    base = f"/pacientes/{mio['id']}"
+    ajenos = [
+        ("GET", base, None), ("GET", base + "/escenarios", None), ("POST", base + "/escenarios", {"nombre": "X", "nivel_intervencion": "nula"}),
+        ("PUT", f"{base}/escenarios/{esc['id']}", {"nombre": "Y", "nivel_intervencion": "nula"}), ("DELETE", f"{base}/escenarios/{esc['id']}", None),
+        ("POST", base + "/simular", {}), ("GET", base + "/simulaciones", None), ("GET", f"{base}/simulaciones/{run}", None),
+    ]
+    for metodo, ruta, cuerpo in ajenos:
+        # 404 y no 403: no se revela que ese paciente existe
+        assert cliente.request(metodo, ruta, json=cuerpo, headers=otro).status_code == 404, (metodo, ruta)
+    # sigue intacto para su dueña
+    assert cliente.get(base, headers=auth).status_code == 200
+    assert cliente.get(f"{base}/simulaciones/{run}", headers=auth).status_code == 200
+
+    # y a la inversa: lo que registra el otro médico no lo ve ella
+    suyo = cliente.post("/pacientes", json={**PACIENTE_BASE, "nombre": "Paciente del otro"}, headers=otro)
+    assert suyo.status_code == 201
+    assert cliente.get(f"/pacientes/{suyo.json()['id']}", headers=auth).status_code == 404
+
+
+def test_cambiar_rol_y_restablecer_contrasena(cliente, admin_auth, crear_cuenta):
+    u = crear_cuenta("Cambio", "cambio@prueba.bo", "clave-vieja", "medico").json()
+    r = cliente.patch(f"/usuarios/{u['id']}", json={"password": "clave-nueva", "nombre": "Cambio Nuevo"}, headers=admin_auth)
+    assert r.status_code == 200 and r.json()["nombre"] == "Cambio Nuevo"
+    assert _login(cliente, "cambio@prueba.bo", "clave-vieja").status_code == 401
+    assert _login(cliente, "cambio@prueba.bo", "clave-nueva").status_code == 200
+
+    # al pasar a admin gana /usuarios y pierde los pacientes
+    assert cliente.patch(f"/usuarios/{u['id']}", json={"rol": "admin"}, headers=admin_auth).status_code == 200
+    h = cabeceras(cliente, "cambio@prueba.bo", "clave-nueva")
+    assert cliente.get("/usuarios", headers=h).status_code == 200
+    assert cliente.get("/pacientes", headers=h).status_code == 403
+
+
+def test_el_admin_no_puede_tomar_el_correo_de_otra_cuenta_ni_editar_una_inexistente(cliente, admin_auth, crear_cuenta):
+    a = crear_cuenta("Uno", "uno@prueba.bo").json()
+    crear_cuenta("Dos", "dos@prueba.bo")
+    assert cliente.patch(f"/usuarios/{a['id']}", json={"correo": "DOS@prueba.bo"}, headers=admin_auth).status_code == 400
+    assert cliente.patch("/usuarios/999999", json={"nombre": "X"}, headers=admin_auth).status_code == 404
+
+
+def test_cuenta_desactivada_no_entra_y_su_token_deja_de_valer(cliente, admin_auth, crear_cuenta):
+    u = crear_cuenta("Baja", "baja@prueba.bo", "clave-baja").json()
+    h = cabeceras(cliente, "baja@prueba.bo", "clave-baja")
+    assert cliente.get("/auth/yo", headers=h).status_code == 200
+
+    assert cliente.patch(f"/usuarios/{u['id']}", json={"activo": False}, headers=admin_auth).json()["activo"] is False
+    assert cliente.get("/auth/yo", headers=h).status_code == 401                       # token vigente, pero cuenta inactiva
+    r = _login(cliente, "baja@prueba.bo", "clave-baja")
+    assert r.status_code == 403 and "desactivada" in r.json()["detail"]
+    assert _login(cliente, "baja@prueba.bo", "clave-equivocada").status_code == 401    # con clave mala no revela el estado
+
+    assert cliente.patch(f"/usuarios/{u['id']}", json={"activo": True}, headers=admin_auth).status_code == 200
+    assert _login(cliente, "baja@prueba.bo", "clave-baja").status_code == 200
+
+
+def test_el_admin_no_puede_quedarse_sin_acceso(cliente, admin_auth, crear_cuenta):
+    yo = cliente.get("/auth/yo", headers=admin_auth).json()
+    assert cliente.patch(f"/usuarios/{yo['id']}", json={"activo": False}, headers=admin_auth).status_code == 400
+    assert cliente.patch(f"/usuarios/{yo['id']}", json={"rol": "medico"}, headers=admin_auth).status_code == 400
+    assert cliente.get("/auth/yo", headers=admin_auth).json()["rol"] == "admin"          # sigue siendo admin
+
+    # otro admin sí puede desactivar al primero (queda él); luego lo reactiva para no afectar otras pruebas
+    crear_cuenta("Admin 2", "admin2@prueba.bo", "clave-admin2", "admin")
+    h2 = cabeceras(cliente, "admin2@prueba.bo", "clave-admin2")
+    assert cliente.patch(f"/usuarios/{yo['id']}", json={"activo": False}, headers=h2).status_code == 200
+    assert cliente.get("/auth/yo", headers=admin_auth).status_code == 401
+    assert cliente.patch(f"/usuarios/{yo['id']}", json={"activo": True}, headers=h2).status_code == 200
+    assert cliente.get("/auth/yo", headers=admin_auth).status_code == 200

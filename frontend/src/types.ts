@@ -17,12 +17,30 @@ export interface DatosEscenario {
   parametros: ParametrosIntervencion | null;
 }
 
+export type Rol = "admin" | "medico";
+
 export interface Usuario {
   id: number;
   nombre: string;
   correo: string;
-  rol: string;
+  rol: Rol;
+  activo: boolean;
   creado_en: string;
+}
+
+export interface NuevoUsuario {
+  nombre: string;
+  correo: string;
+  password: string;
+  rol: Rol;
+}
+
+export interface CambiosUsuario {
+  nombre?: string;
+  correo?: string;
+  rol?: Rol;
+  activo?: boolean;
+  password?: string;
 }
 
 export interface Paciente {

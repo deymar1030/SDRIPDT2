@@ -57,6 +57,7 @@ export default function Simulator() {
   const [modal, setModal] = useState<{ abierto: boolean; escenario: Escenario | null }>({ abierto: false, escenario: null });
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorPaciente, setErrorPaciente] = useState<string | null>(null);
   const [historial, setHistorial] = useState<SimulationRunSummary[]>([]);
   const [comparacion, setComparacion] = useState<SimulateResponse | null>(null);
   const [cargandoComparacion, setCargandoComparacion] = useState<number | null>(null);
@@ -81,18 +82,23 @@ export default function Simulator() {
     api.listarPacientes().then((lista) => {
       setPacientesTodos(lista);
       if (!pacienteId && lista.length) setParams({ id: String(lista[0].id) });
-    });
+    }).catch(() => setPacientesTodos([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function recargarHistorial(id: number) {
-    api.listarSimulaciones(id).then(setHistorial);
+    api.listarSimulaciones(id).then(setHistorial).catch(() => setHistorial([]));
   }
 
   useEffect(() => {
     if (!pacienteId) return;
-    api.obtenerPaciente(Number(pacienteId)).then(setPaciente);
-    api.listarEscenarios(Number(pacienteId)).then(setEscenarios);
+    setErrorPaciente(null);
+    // Un médico solo accede a sus pacientes: si el id es de otro (o no existe) la API responde 404.
+    api.obtenerPaciente(Number(pacienteId)).then(setPaciente).catch((e) => {
+      setPaciente(null);
+      setErrorPaciente(e instanceof Error ? e.message : "No se pudo cargar al paciente");
+    });
+    api.listarEscenarios(Number(pacienteId)).then(setEscenarios).catch(() => setEscenarios([]));
     setResultados(null);
     setComparacion(null);
     recargarHistorial(Number(pacienteId));
@@ -151,6 +157,12 @@ export default function Simulator() {
 
   return (
     <Shell titulo="Simulador de pronóstico" subtitulo="Monte Carlo · dinámica de sistemas en tiempo discreto">
+      {errorPaciente && (
+        <div className="mb-5">
+          <Aviso tipo="error">{errorPaciente}. Elige otro paciente de la lista.</Aviso>
+        </div>
+      )}
+
       {/* Selección de paciente */}
       <Panel className="mb-5">
         <div className="flex flex-wrap items-center justify-between gap-4">

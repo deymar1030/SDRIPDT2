@@ -82,16 +82,27 @@ En Coolify:
 4. Deploy. La API queda en `https://tu-dominio/api` y su documentación en
    `https://tu-dominio/api/docs`.
 
-Para crear más usuarios después, desde la terminal del contenedor `backend`
-en Coolify: `python -m app.crear_usuario --correo ... --nombre "..." --rol medico`.
+Las demás cuentas las crea el admin desde la pantalla **Usuarios** de la propia
+app (no hay registro público). Como alternativa, desde la terminal del contenedor
+`backend`: `python -m app.crear_usuario --correo ... --nombre "..." --rol medico`.
 
 En desarrollo local se puede seguir usando SQLite (`DATABASE_URL` en
 `backend/.env`) o apuntar a un PostgreSQL con las variables `POSTGRES_*`.
 
 ## Qué está implementado
 
-- Login / registro con JWT, pacientes, escenarios e historial persistidos en
-  PostgreSQL (o SQLite en desarrollo) vía SQLAlchemy + Alembic.
+- Login con JWT, pacientes, escenarios e historial persistidos en PostgreSQL (o
+  SQLite en desarrollo) vía SQLAlchemy + Alembic.
+- **Cuentas y roles, sin registro público.** Solo existen dos roles:
+  - **admin**: crea, edita, desactiva y restablece la contraseña de las cuentas
+    (pantalla *Usuarios*). **No tiene acceso a los datos de los pacientes**
+    (la API responde 403 en todas las rutas de pacientes).
+  - **médico**: registra pacientes, arma escenarios, simula y ve el historial,
+    solo de **los pacientes que registró él**; los de otro médico responden 404.
+  Los pacientes **no son usuarios**: son fichas que registra el médico. Las
+  cuentas no se borran, se desactivan (la sesión de una cuenta desactivada deja
+  de valer al instante). Un admin no puede desactivarse ni quitarse el rol a sí
+  mismo, para no quedarse sin acceso.
 - Motor de simulación (`backend/app/engine.py`): modelo de dinámica de
   sistemas en tiempo discreto (Δt = 1 semana) con las reglas R1–R7 del
   documento `docs/Modelo_Simulacion_DMT2_LaPaz_Calibrado.pdf` — componentes
@@ -104,8 +115,6 @@ En desarrollo local se puede seguir usando SQLite (`DATABASE_URL` en
 
 ## Qué falta (fuera de alcance de esta vuelta)
 
-- Administración de usuarios desde la app (hoy se crean con
-  `app.crear_usuario` o con el registro público).
 - Validación del modelo con datos locales (SNIS-VE / SEDES La Paz / IDF).
   Las constantes de las reglas R1–R7 se ajustaron con
   `backend/calibracion/calibrar.py` a rangos publicados en la literatura

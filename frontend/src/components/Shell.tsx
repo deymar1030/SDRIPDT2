@@ -1,9 +1,10 @@
 import { useState, type ReactNode } from "react";
 import { Link, NavLink } from "react-router-dom";
-import { LayoutDashboard, FlaskConical, Users, Activity, UserPlus, Menu, X } from "lucide-react";
+import { LayoutDashboard, FlaskConical, Users, UserCog, Activity, UserPlus, Menu, X } from "lucide-react";
 import { UserMenu } from "./UserMenu";
 import { BotonEnlace } from "./ui";
 import { BotonTema } from "../tema/TemaContext";
+import { useAuth } from "../auth/AuthContext";
 
 export function Marca({ tamano = "md" }: { tamano?: "md" | "lg" }) {
   const grande = tamano === "lg";
@@ -22,16 +23,19 @@ export function Marca({ tamano = "md" }: { tamano?: "md" | "lg" }) {
   );
 }
 
-const NAV = [
+const NAV_MEDICO = [
   { to: "/dashboard", label: "Panel principal", icon: LayoutDashboard },
   { to: "/pacientes", label: "Pacientes", icon: Users },
   { to: "/simulador", label: "Simulador", icon: FlaskConical },
 ];
+const NAV_ADMIN = [{ to: "/usuarios", label: "Usuarios", icon: UserCog }];
 
 function Navegacion({ alNavegar }: { alNavegar?: () => void }) {
+  const { usuario } = useAuth();
+  const nav = usuario?.rol === "admin" ? NAV_ADMIN : NAV_MEDICO;
   return (
     <nav className="flex flex-col gap-1">
-      {NAV.map(({ to, label, icon: Icon }) => (
+      {nav.map(({ to, label, icon: Icon }) => (
         <NavLink
           key={to}
           to={to}
@@ -57,6 +61,8 @@ function Navegacion({ alNavegar }: { alNavegar?: () => void }) {
 
 export function Shell({ titulo, subtitulo, children }: { titulo: string; subtitulo?: string; children: ReactNode }) {
   const [menuMovil, setMenuMovil] = useState(false);
+  const { usuario } = useAuth();
+  const esMedico = usuario?.rol !== "admin";
 
   const contenidoLateral = (
     <>
@@ -67,9 +73,11 @@ export function Shell({ titulo, subtitulo, children }: { titulo: string; subtitu
         <Navegacion alNavegar={() => setMenuMovil(false)} />
       </div>
       <div className="mt-auto pt-6">
-        <BotonEnlace to="/pacientes/nuevo" variante="secundario" icono={<UserPlus size={16} />} className="w-full">
-          Nuevo paciente
-        </BotonEnlace>
+        {esMedico && (
+          <BotonEnlace to="/pacientes/nuevo" variante="secundario" icono={<UserPlus size={16} />} className="w-full">
+            Nuevo paciente
+          </BotonEnlace>
+        )}
       </div>
     </>
   );
