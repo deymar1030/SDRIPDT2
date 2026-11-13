@@ -1,0 +1,132 @@
+@import "tailwindcss";
+
+/* Paleta única del sistema, tomada del panel metabólico (HUD):
+   azul noche de fondo, paneles algo más claros, acento cian.
+   Estos valores son el tema OSCURO (por defecto); el tema claro los
+   redefine más abajo sobre [data-theme="light"]. */
+@theme {
+  --color-hud-fondo: #060d20;
+  --color-hud-panel: #0b1836;
+  --color-hud-panel-2: #102349;
+  --color-hud-borde: rgb(56 189 248 / 0.18);
+  --color-hud-borde-fuerte: rgb(56 189 248 / 0.4);
+  --color-hud-acento: #22d3ee;
+  --color-hud-texto: #e6f4ff;
+  --color-hud-suave: #8fb3d9;
+  --color-hud-tenue: #5b7ba3;
+}
+
+:root {
+  /* Cuánto del color de nivel (verde/amarillo/naranja/rojo) se conserva
+     al usarlo como TEXTO; el resto se mezcla con --color-white, que en
+     oscuro es blanco y en claro es azul marino → en claro oscurece. */
+  --tinta-pct: 100%;
+  --rejilla: rgb(56 189 248 / 0.035);
+  --fondo-brillo: #0f2350;
+  --sombra-panel: 0 8px 30px rgb(0 0 0 / 0.25);
+  color-scheme: dark;
+}
+
+/* ---------------- Tema claro ----------------
+   Además de los tokens hud-*, se redefinen los pocos colores de Tailwind
+   que los componentes usan como texto claro sobre fondo oscuro (white,
+   sky/cyan/amber/rose/emerald claros): en claro pasan a tonos oscuros. */
+:root[data-theme="light"] {
+  --color-hud-fondo: #eef3f9;
+  --color-hud-panel: #ffffff;
+  --color-hud-panel-2: #e6eef8;
+  --color-hud-borde: rgb(14 116 144 / 0.16);
+  --color-hud-borde-fuerte: rgb(8 145 178 / 0.42);
+  --color-hud-acento: #0891b2;
+  --color-hud-texto: #1b2f4d;
+  --color-hud-suave: #48607f;
+  --color-hud-tenue: #6b809c;
+
+  --color-white: #0b1b3a;
+  --color-sky-100: #0c4a6e;
+  --color-sky-200: #075985;
+  --color-sky-300: #0369a1;
+  --color-cyan-200: #155e75;
+  --color-cyan-300: #0e7490;
+  --color-amber-100: #78350f;
+  --color-amber-200: #92400e;
+  --color-amber-300: #b45309;
+  --color-rose-200: #9f1239;
+  --color-rose-300: #be123c;
+  --color-rose-400: #e11d48;
+  --color-emerald-200: #065f46;
+  --color-emerald-400: #059669;
+
+  --tinta-pct: 62%;
+  --rejilla: rgb(8 145 178 / 0.06);
+  --fondo-brillo: #dbeafe;
+  --sombra-panel: 0 4px 18px rgb(15 40 80 / 0.07);
+  color-scheme: light;
+}
+
+/* Isla oscura: el panel metabólico, el héroe del panel principal y las
+   ilustraciones holográficas son "pantallas" y se ven oscuras en ambos
+   temas. Restablece todos los valores redefinidos arriba. */
+:root[data-theme="light"] .isla-oscura,
+.isla-oscura {
+  --color-hud-fondo: #060d20;
+  --color-hud-panel: #0b1836;
+  --color-hud-panel-2: #102349;
+  --color-hud-borde: rgb(56 189 248 / 0.18);
+  --color-hud-borde-fuerte: rgb(56 189 248 / 0.4);
+  --color-hud-acento: #22d3ee;
+  --color-hud-texto: #e6f4ff;
+  --color-hud-suave: #8fb3d9;
+  --color-hud-tenue: #5b7ba3;
+
+  --color-white: #fff;
+  --color-sky-100: #e0f2fe;
+  --color-sky-200: #bae6fd;
+  --color-sky-300: #7dd3fc;
+  --color-cyan-200: #a5f3fc;
+  --color-cyan-300: #67e8f9;
+  --color-amber-100: #fef3c7;
+  --color-amber-200: #fde68a;
+  --color-amber-300: #fcd34d;
+  --color-rose-200: #fecdd3;
+  --color-rose-300: #fda4af;
+  --color-rose-400: #fb7185;
+  --color-emerald-200: #a7f3d0;
+  --color-emerald-400: #34d399;
+
+  --tinta-pct: 100%;
+  --sombra-panel: 0 8px 30px rgb(0 0 0 / 0.25);
+  color-scheme: dark;
+  color: var(--color-hud-texto);
+}
+
+html, body, #root { height: 100%; }
+body {
+  @apply text-hud-texto antialiased;
+  background:
+    linear-gradient(var(--rejilla) 1px, transparent 1px) 0 0 / 32px 32px,
+    linear-gradient(90deg, var(--rejilla) 1px, transparent 1px) 0 0 / 32px 32px,
+    radial-gradient(ellipse at 60% 0%, var(--fondo-brillo) 0%, var(--color-hud-fondo) 55%) fixed;
+  background-color: var(--color-hud-fondo);
+  transition: background-color 0.2s ease;
+}
+
+html { scroll-behavior: smooth; }
+
+::selection { background: rgb(34 211 238 / 0.35); }
+
+input[type="range"] { accent-color: var(--color-hud-acento); }
+
+@keyframes escaneo { from { top: -10%; } to { top: 100%; } }
+@keyframes ecg { from { stroke-dashoffset: 260; } to { stroke-dashoffset: -260; } }
+@keyframes pulso-organo { 0% { transform: scale(0.6); opacity: 0.55; } 100% { transform: scale(1.9); opacity: 0; } }
+@keyframes flotar { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgb(56 189 248 / 0.25); border-radius: 9999px; }
