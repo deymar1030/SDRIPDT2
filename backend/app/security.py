@@ -13,6 +13,12 @@ from .models import User
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 
+def normalizar_correo(correo: str) -> str:
+    """Los correos se guardan y comparan siempre en minúsculas y sin espacios,
+    para que Ana@X.bo y ana@x.bo sean la misma cuenta."""
+    return correo.strip().lower()
+
+
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 

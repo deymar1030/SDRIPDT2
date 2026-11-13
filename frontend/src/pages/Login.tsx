@@ -8,8 +8,8 @@ import { Aviso, Boton, Campo, Entrada } from "../components/ui";
 export default function Login() {
   const { iniciarSesion } = useAuth();
   const navigate = useNavigate();
-  const [correo, setCorreo] = useState("marina.choque@umsa.bo");
-  const [password, setPassword] = useState("demo1234");
+  const [correo, setCorreo] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
 
@@ -50,10 +50,6 @@ export default function Login() {
           Crear cuenta
         </Link>
       </p>
-      <div className="mt-6 rounded-lg border border-hud-borde bg-hud-panel/60 p-3 text-xs text-hud-suave">
-        Cuenta de demostración: <span className="font-mono text-cyan-200">marina.choque@umsa.bo</span> /{" "}
-        <span className="font-mono text-cyan-200">demo1234</span>
-      </div>
     </AuthLayout>
   );
 }

@@ -137,7 +137,7 @@ function Resultado({ etiqueta, valor, nota }: { etiqueta: ReactNode; valor: Reac
 }
 
 function CalculadoraEstadoInicial() {
-  // Valores por defecto: paciente de ejemplo "Rosa Fernández" (prediabetes).
+  // Valores ilustrativos de un caso típico de prediabetes (no son datos de ningún paciente).
   const [glucosa, setGlucosa] = useState("108");
   const [insulina, setInsulina] = useState("15");
   const [imc, setImc] = useState("31");
@@ -166,7 +166,7 @@ function CalculadoraEstadoInicial() {
         <Calculator size={17} className="text-hud-acento" />
         <p className="font-semibold text-white">Pruébalo: calcula el estado inicial</p>
       </div>
-      <p className="mt-1 text-sm text-hud-tenue">Valores precargados del paciente de ejemplo Rosa F. (52 años, prediabetes). Cámbialos y mira cómo se recalcula todo.</p>
+      <p className="mt-1 text-sm text-hud-tenue">Valores ilustrativos de un caso típico de prediabetes. Cámbialos y mira cómo se recalcula todo.</p>
 
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Campo etiqueta={<>Glucosa <Unidad>mg/dL</Unidad></>} htmlFor="c-glu"><Entrada id="c-glu" type="number" value={glucosa} onChange={(e) => setGlucosa(e.target.value)} /></Campo>
@@ -566,7 +566,7 @@ export default function ComoFunciona() {
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-hud-borde-fuerte bg-hud-acento/10 p-6">
             <div>
               <p className="font-semibold text-white">Ahora míralo en acción</p>
-              <p className="text-sm text-hud-suave">Ejecuta una simulación con uno de los pacientes de ejemplo.</p>
+              <p className="text-sm text-hud-suave">Registra a un paciente y compara sus escenarios en el simulador.</p>
             </div>
             <BotonEnlace to={usuario ? "/simulador" : "/login"} icono={<FlaskConical size={16} />}>
               {usuario ? "Abrir el simulador" : "Ingresar para simular"}

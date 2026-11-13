@@ -1,0 +1,62 @@
+# Simulador IR — despliegue con Docker Compose (pensado para Coolify).
+#
+# Solo el servicio "frontend" se publica: en Coolify asígnale el dominio
+# (puerto 80); Coolify pone el HTTPS. nginx sirve la app y reenvía /api al
+# backend, que junto con la base de datos queda en la red interna.
+#
+# Variables obligatorias (en Coolify: pestaña Environment Variables):
+#   POSTGRES_PASSWORD, JWT_SECRET
+# Primer usuario (opcional; se crea solo si no existe):
+#   INIT_USER_CORREO, INIT_USER_NOMBRE, INIT_USER_PASSWORD, INIT_USER_ROL
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-simulador}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-simulador}
+    volumes:
+      - postgres-datos:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-simulador}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-simulador}
+      JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET (mínimo 32 caracteres)}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-480}
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+      INIT_USER_CORREO: ${INIT_USER_CORREO:-}
+      INIT_USER_NOMBRE: ${INIT_USER_NOMBRE:-}
+      INIT_USER_PASSWORD: ${INIT_USER_PASSWORD:-}
+      INIT_USER_ROL: ${INIT_USER_ROL:-admin}
+    expose:
+      - "8000"
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    expose:
+      - "80"
+
+volumes:
+  postgres-datos:

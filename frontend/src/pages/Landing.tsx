@@ -299,7 +299,7 @@ export default function Landing() {
         <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-6 px-4 py-14 sm:px-6 md:flex-row md:items-center">
           <div>
             <h2 className="text-2xl font-bold text-white">¿Listo para simular tu primer pronóstico?</h2>
-            <p className="mt-1 text-hud-suave">Hay pacientes de ejemplo cargados para que lo pruebes en minutos.</p>
+            <p className="mt-1 text-hud-suave">Registra a tu paciente con sus laboratorios de hoy y compara sus escenarios en minutos.</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <BotonEnlace to={destinoPrincipal} icono={<FlaskConical size={16} />}>

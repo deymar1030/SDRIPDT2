@@ -4,20 +4,21 @@ from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from ..database import get_db
-from ..security import create_access_token, get_current_user, hash_password, verify_password
+from ..security import create_access_token, get_current_user, hash_password, normalizar_correo, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/registro", response_model=schemas.Token, status_code=status.HTTP_201_CREATED)
 def registrar(datos: schemas.UserCreate, db: Session = Depends(get_db)):
-    existe = db.query(models.User).filter(models.User.correo == datos.correo).first()
+    correo = normalizar_correo(datos.correo)
+    existe = db.query(models.User).filter(models.User.correo == correo).first()
     if existe:
         raise HTTPException(status_code=400, detail="Ya existe una cuenta con ese correo")
 
     usuario = models.User(
         nombre=datos.nombre,
-        correo=datos.correo,
+        correo=correo,
         password_hash=hash_password(datos.password),
         rol=datos.rol,
     )
@@ -31,7 +32,7 @@ def registrar(datos: schemas.UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=schemas.Token)
 def iniciar_sesion(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    usuario = db.query(models.User).filter(models.User.correo == form.username).first()
+    usuario = db.query(models.User).filter(models.User.correo == normalizar_correo(form.username)).first()
     if not usuario or not verify_password(form.password, usuario.password_hash):
         raise HTTPException(status_code=401, detail="Correo o contraseña incorrectos")
 
@@ -50,12 +51,13 @@ def editar_perfil(
     db: Session = Depends(get_db),
     usuario: models.User = Depends(get_current_user),
 ):
-    if datos.correo != usuario.correo:
-        existe = db.query(models.User).filter(models.User.correo == datos.correo, models.User.id != usuario.id).first()
+    correo = normalizar_correo(datos.correo)
+    if correo != usuario.correo:
+        existe = db.query(models.User).filter(models.User.correo == correo, models.User.id != usuario.id).first()
         if existe:
             raise HTTPException(status_code=400, detail="Ya existe una cuenta con ese correo")
     usuario.nombre = datos.nombre
-    usuario.correo = datos.correo
+    usuario.correo = correo
     db.commit()
     db.refresh(usuario)
     return usuario
