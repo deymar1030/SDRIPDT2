@@ -1,28 +1,24 @@
+import secrets
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
-from ..clinical import calcular_homa_ir, clasificar_etapa_clinica
 from ..database import get_db
-from ..engine import calcular_supuestos, estado_inicial_completo, simular_paciente
-from ..intervencion import peso_del_paciente, resolver_intervencion
+from ..motor import calcular_supuestos, sensibilidad_inicial, simular_escenarios, tasa_desgaste_adiposo
+from ..motor.escenarios import resolver_cambio
+from ..motor.paciente import PerfilClinico
 from ..security import requiere_medico
 
 router = APIRouter(prefix="/pacientes", tags=["pacientes"])
 
 
 def _a_patient_out(p: models.Patient) -> schemas.PatientOut:
-    homa = calcular_homa_ir(p.glucosa, p.insulina)
-    etapa = clasificar_etapa_clinica(p.glucosa, p.hba1c, homa)
-    latente = estado_inicial_completo(p.glucosa, p.insulina, p.imc, p.hba1c)
     return schemas.PatientOut(
-        id=p.id, nombre=p.nombre, edad=p.edad, sexo=p.sexo, imc=p.imc, peso=p.peso, talla=p.talla,
-        glucosa=p.glucosa, insulina=p.insulina, hba1c=p.hba1c,
-        antecedente_familiar=p.antecedente_familiar, hipertension=p.hipertension,
-        tabaquismo=p.tabaquismo, notas=p.notas, creado_en=p.creado_en,
-        homaIR=homa, etapaActual=etapa,
-        estadoLatente=schemas.EstadoInicial(
-            sI0=round(latente["sI0"], 3), cBeta0=round(latente["cBeta0"], 1), mAdip0=round(latente["mAdip0"], 1),
+        id=p.id, nombre=p.nombre, edad=p.edad, imc=p.imc, sedentarismo=p.sedentarismo,
+        antecedente_familiar=p.antecedente_familiar, notas=p.notas, creado_en=p.creado_en,
+        estadoLatente=schemas.EstadoPaciente(
+            sI0=round(sensibilidad_inicial(p.imc), 3), kVat=round(tasa_desgaste_adiposo(p.sedentarismo, p.imc), 5),
         ),
     )
 
@@ -55,8 +51,6 @@ def listar_pacientes_riesgo(db: Session = Depends(get_db), usuario: models.User 
     pacientes = db.query(models.Patient).filter(models.Patient.creado_por_id == usuario.id).all()
     filas: list[schemas.PacienteRiesgo] = []
     for p in pacientes:
-        homa = calcular_homa_ir(p.glucosa, p.insulina)
-        etapa = clasificar_etapa_clinica(p.glucosa, p.hba1c, homa)
         ultima = (
             db.query(models.SimulationRun)
             .filter(models.SimulationRun.paciente_id == p.id)
@@ -71,7 +65,7 @@ def listar_pacientes_riesgo(db: Session = Depends(get_db), usuario: models.User 
                 etapaMediana=esc["etapaMediana"], creadoEn=ultima.creado_en,
             )
         filas.append(schemas.PacienteRiesgo(
-            id=p.id, nombre=p.nombre, edad=p.edad, imc=p.imc, etapaActual=etapa, ultimaSimulacion=resumen,
+            id=p.id, nombre=p.nombre, edad=p.edad, imc=p.imc, sedentarismo=p.sedentarismo, ultimaSimulacion=resumen,
         ))
 
     filas.sort(key=lambda f: f.ultimaSimulacion.prob5 if f.ultimaSimulacion else -1, reverse=True)
@@ -174,28 +168,28 @@ def simular(
     if not escenarios:
         raise HTTPException(status_code=400, detail="El paciente no tiene escenarios para simular")
 
-    peso, peso_estimado = peso_del_paciente(paciente.peso, paciente.imc)
+    perfil = PerfilClinico(paciente.edad, paciente.imc, paciente.sedentarismo, paciente.antecedente_familiar)
+    semilla = datos.semilla if datos.semilla is not None else secrets.randbelow(2**32)
 
-    resultados_dicts = []
-    for esc in escenarios:
-        efecto = resolver_intervencion(esc.nivel_intervencion, esc.parametros, peso, peso_estimado)
-        salida = simular_paciente(
-            edad=paciente.edad,
-            imc=paciente.imc,
-            glucosa=paciente.glucosa,
-            insulina=paciente.insulina,
-            hba1c=paciente.hba1c,
-            antecedente_familiar=paciente.antecedente_familiar,
-            horizonte_anios=datos.horizonte_anios,
-            trayectorias=datos.trayectorias,
-            intervencion=efecto,
-        )
-        resultados_dicts.append({
-            "escenarioId": esc.id, "nombre": esc.nombre, "nivelIntervencion": esc.nivel_intervencion,
-            "parametros": esc.parametros, "intervencion": efecto, **salida,
-        })
+    salidas = simular_escenarios(
+        edad=paciente.edad,
+        imc=paciente.imc,
+        sedentarismo=paciente.sedentarismo,
+        antecedente_familiar=paciente.antecedente_familiar,
+        horizonte_anios=datos.horizonte_anios,
+        trayectorias=datos.trayectorias,
+        cambios=[resolver_cambio(esc.nivel_intervencion, esc.parametros, perfil) for esc in escenarios],
+        semilla=semilla,
+    )
+    resultados_dicts = [
+        {"escenarioId": esc.id, "nombre": esc.nombre, "nivelIntervencion": esc.nivel_intervencion, "parametros": esc.parametros, **salida}
+        for esc, salida in zip(escenarios, salidas)
+    ]
 
-    supuestos = calcular_supuestos(paciente.imc, paciente.antecedente_familiar)
+    supuestos = {
+        **calcular_supuestos(paciente.edad, paciente.imc, paciente.sedentarismo, paciente.antecedente_familiar),
+        "semilla": semilla,
+    }
 
     corrida = models.SimulationRun(
         paciente_id=paciente_id,
@@ -214,6 +208,7 @@ def simular(
         pacienteId=paciente_id,
         horizonteAnios=datos.horizonte_anios,
         trayectorias=datos.trayectorias,
+        semilla=semilla,
         resultados=[schemas.ResultadoEscenario(**r) for r in resultados_dicts],
         supuestos=schemas.Supuestos(**supuestos),
     )
@@ -249,6 +244,7 @@ def obtener_simulacion(paciente_id: int, run_id: int, db: Session = Depends(get_
         pacienteId=paciente_id,
         horizonteAnios=corrida.horizonte_anios,
         trayectorias=corrida.trayectorias,
+        semilla=corrida.supuestos.get("semilla", 0),
         resultados=[schemas.ResultadoEscenario(**r) for r in corrida.resultados],
         supuestos=schemas.Supuestos(**corrida.supuestos),
     )

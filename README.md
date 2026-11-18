@@ -52,12 +52,18 @@ pytest
 ```
 
 Las pruebas del backend usan una base SQLite temporal creada con las
-migraciones reales, así que no tocan la base de desarrollo. Cubren la
-clasificación clínica, el motor de simulación, la traducción de hábitos a
-efectos del modelo, la configuración, el script `crear_usuario` y toda la API
-(autenticación, seguridad, pacientes, escenarios, simulación, historial y
-riesgo). Dos pruebas están marcadas como fallo esperado (`xfail`): documentan
-la calibración clínica pendiente del motor y pasarán a verde cuando se recalibre.
+migraciones reales, así que no tocan la base de desarrollo. Cubren cada archivo
+del motor (variables aleatorias, ecuaciones, paciente, simulador, escenarios,
+índices y resultados), la validación contra las cuatro personas del informe, el
+script `crear_usuario`, las migraciones y toda la API (autenticación, roles,
+pacientes, escenarios, simulación, historial y riesgo).
+
+Para ver las cuatro personas del informe contra el simulador:
+
+```
+cd backend
+python probar_motor.py
+```
 
 ## Despliegue con Docker (Coolify)
 
@@ -103,25 +109,36 @@ En desarrollo local se puede seguir usando SQLite (`DATABASE_URL` en
   cuentas no se borran, se desactivan (la sesión de una cuenta desactivada deja
   de valer al instante). Un admin no puede desactivarse ni quitarse el rol a sí
   mismo, para no quedarse sin acceso.
-- Motor de simulación (`backend/app/engine.py`): modelo de dinámica de
-  sistemas en tiempo discreto (Δt = 1 semana) con las reglas R1–R7 del
-  documento `docs/Modelo_Simulacion_DMT2_LaPaz_Calibrado.pdf` — componentes
-  A (estilo de vida), B (tejido periférico), C (páncreas endocrino) y D
-  (homeostasis clínica), ancladas al estado inicial de cada paciente real
-  (no una cohorte sintética).
-- Comparación de hasta 4 escenarios de intervención (nula/moderada/intensiva)
-  por paciente, con bandas de incertidumbre (percentil 10–90) sobre glucosa,
-  insulina, HOMA-IR y reserva pancreática.
+- Motor de simulación (`backend/app/motor/`): modelo de Topp et al. del informe
+  `docs/INFORMESIMULACION.pdf`, resuelto con el método de Euler a 5 pasos por día
+  y repetido con Monte Carlo (NumPy vectorizado). Hay un archivo por sección del
+  informe:
 
-## Qué falta (fuera de alcance de esta vuelta)
+  | Informe | Archivo | Contenido |
+  |---|---|---|
+  | 3.2.1 Constantes y parámetros | `parametros.py` | Constantes de Topp, perfiles de sedentarismo, límites |
+  | 3.2.1 Variables aleatorias | `variables_aleatorias.py` | Weibull, Normal, Gamma, Bernoulli, Uniforme |
+  | 3.2.2 Ecuaciones 1 a 5 | `ecuaciones.py` | Una función por ecuación y balance homeostático |
+  | 3.3.1 `PacienteVirtual` | `paciente.py` | S_I0, k_VAT, riesgo_vida, a_gen |
+  | 3.3.1 `SimuladorClinico`, Ec. 6 | `simulador.py` | Bucle de Euler y condición de parada |
+  | 3.4.1 Escenarios | `escenarios.py` | Cambios de estilo de vida |
+  | 3.4.2 Índices clínicos | `indices_clinicos.py` | HOMA-IR, HOMA-β, déficit beta, etapa |
+  | 3.4.2 y 3.4.3 Gráficos | `resultados.py` | Bandas, trayectoria individual, pre-diagnóstico |
 
-- Validación del modelo con datos locales (SNIS-VE / SEDES La Paz / IDF).
-  Las constantes de las reglas R1–R7 se ajustaron con
-  `backend/calibracion/calibrar.py` a rangos publicados en la literatura
-  (Diabetes Prevention Program, ADA): 7 pacientes tipo reproducen incidencias
-  a 5 años del orden de las reportadas, con un efecto de la intervención y un
-  comportamiento del peso creíbles, y las pruebas de `backend/tests` cuidan
-  esas cifras. Es un ajuste a rangos publicados, **no** una validación con
-  datos de la población de La Paz; los resultados son orientativos.
-- Adherencia parcial a la intervención y uso de hipertensión, tabaquismo y
-  sexo en el cálculo (hoy se registran pero no intervienen).
+- Entradas del paciente: nombre, edad, IMC, sedentarismo (activo, moderado,
+  severo) y antecedentes familiares (sí/no).
+- Comparación de hasta 4 escenarios de estilo de vida por paciente (sin cambios,
+  moderada, intensiva o personalizada). Todos usan los mismos números aleatorios,
+  de modo que la diferencia se debe solo al cambio.
+- Gráficas del informe en la interfaz: perfil metabólico de 4 gráficas
+  (glucemia, HOMA-β, déficit beta, sensibilidad), glucemia antes del diagnóstico,
+  tiempo libre de diabetes, incidencia acumulada e histograma del diagnóstico.
+
+## Qué falta
+
+- Calibración y validación del modelo. Usa las constantes teóricas de Topp et al.;
+  al diagnóstico el déficit de células β es de ~33 %, menor que el 50–60 % del
+  UKPDS. Los resultados son orientativos.
+- Todo paciente parte de glucosa 90 mg/dL e insulina 10 µU/mL: no se usan
+  laboratorios propios del paciente.
+- Sexo, hipertensión y tabaquismo no intervienen en el modelo.

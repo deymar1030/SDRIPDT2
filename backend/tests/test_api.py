@@ -99,37 +99,37 @@ def test_las_contrasenas_se_guardan_con_hash_bcrypt(cliente, auth):
 
 
 # ============================================================== pacientes
-@pytest.mark.parametrize("glucosa, insulina, hba1c, etapa", [
-    (82, 5, 5.0, "sano"), (92, 12, 5.4, "resistencia"), (108, 15, 5.9, "prediabetes"), (131, 19, 6.6, "diabetes"),
-])
-def test_paciente_se_clasifica_al_registrarse(crear_paciente, glucosa, insulina, hba1c, etapa):
-    p = crear_paciente(glucosa=glucosa, insulina=insulina, hba1c=hba1c)
-    assert p["etapaActual"] == etapa
-    assert p["homaIR"] == pytest.approx(glucosa * insulina / 405, abs=0.06)
-    assert set(p["estadoLatente"]) == {"sI0", "cBeta0", "mAdip0"}
-    assert (p["peso"], p["talla"]) == (79, 160)
+def test_paciente_se_registra_con_las_entradas_del_informe(crear_paciente):
+    p = crear_paciente(sedentarismo="severo", antecedente_familiar=False)
+    assert p["sedentarismo"] == "severo" and p["antecedente_familiar"] is False
+    assert set(p) == {"id", "nombre", "edad", "imc", "sedentarismo", "antecedente_familiar", "notas", "creado_en", "estadoLatente"}
+    assert set(p["estadoLatente"]) == {"sI0", "kVat"}
 
 
 @pytest.mark.parametrize("campo, valor", [
-    ("glucosa", 39), ("glucosa", 401), ("insulina", 0), ("insulina", 101), ("hba1c", 2.9), ("hba1c", 15.1),
-    ("edad", 0), ("edad", 111), ("imc", 11), ("imc", 71), ("peso", 19), ("peso", 301), ("talla", 99), ("talla", 231),
+    ("edad", 17), ("edad", 101), ("imc", 11), ("imc", 71), ("sedentarismo", "extremo"), ("antecedente_familiar", None), ("nombre", ""),
 ])
-def test_paciente_rechaza_valores_fuera_de_rango(cliente, auth, campo, valor):
+def test_paciente_rechaza_valores_invalidos(cliente, auth, campo, valor):
     r = cliente.post("/pacientes", json={**PACIENTE_BASE, campo: valor}, headers=auth)
     assert r.status_code == 422
     assert r.json()["detail"][0]["loc"][-1] == campo
 
 
+@pytest.mark.parametrize("campo", ["sedentarismo", "antecedente_familiar", "edad", "imc"])
+def test_paciente_exige_las_entradas_del_informe(cliente, auth, campo):
+    cuerpo = {k: v for k, v in PACIENTE_BASE.items() if k != campo}
+    assert cliente.post("/pacientes", json=cuerpo, headers=auth).status_code == 422
+
+
 def test_paciente_acepta_los_extremos_validos(crear_paciente):
-    assert crear_paciente(glucosa=40, insulina=1, hba1c=3)["id"]
-    assert crear_paciente(glucosa=400, insulina=100, hba1c=15)["id"]
+    assert crear_paciente(edad=18, imc=12)["id"]
+    assert crear_paciente(edad=100, imc=70)["id"]
 
 
-def test_paciente_conserva_acentos_y_antecedente_desconocido(cliente, auth, crear_paciente):
-    p = crear_paciente(nombre="José Núñez Quispe", notas="Ñandú — áéíóú ¿ok?", antecedente_familiar=None)
+def test_paciente_conserva_acentos(cliente, auth, crear_paciente):
+    p = crear_paciente(nombre="José Núñez Quispe", notas="Ñandú — áéíóú ¿ok?")
     leido = cliente.get(f"/pacientes/{p['id']}", headers=auth).json()
     assert leido["nombre"] == "José Núñez Quispe" and leido["notas"] == "Ñandú — áéíóú ¿ok?"
-    assert leido["antecedente_familiar"] is None
 
 
 def test_listar_y_obtener_pacientes(cliente, auth, crear_paciente):
@@ -140,22 +140,22 @@ def test_listar_y_obtener_pacientes(cliente, auth, crear_paciente):
 
 
 # ============================================================== escenarios
-PARAMS = {"reduccion_kcal_dia": 300, "ejercicio_dias": 4, "ejercicio_minutos": 40, "ejercicio_intensidad": "moderada", "inicio_anio": 1, "duracion_anios": 3}
+PARAMS = {"sedentarismo": "activo", "imc_objetivo": 27.0, "inicio_anio": 1}
 
 
 def test_crud_de_escenarios(cliente, auth, crear_paciente):
     pid = crear_paciente()["id"]
     base = f"/pacientes/{pid}/escenarios"
     fijo = cliente.post(base, json={"nombre": "Sin cambios", "nivel_intervencion": "nula"}, headers=auth)
-    pers = cliente.post(base, json={"nombre": "Bici", "nivel_intervencion": "personalizada", "parametros": PARAMS}, headers=auth)
+    pers = cliente.post(base, json={"nombre": "Más activo", "nivel_intervencion": "personalizada", "parametros": PARAMS}, headers=auth)
     assert fijo.status_code == pers.status_code == 201
-    assert fijo.json()["parametros"] is None and pers.json()["parametros"]["ejercicio_dias"] == 4
+    assert fijo.json()["parametros"] is None and pers.json()["parametros"]["sedentarismo"] == "activo"
 
     edit = cliente.put(f"{base}/{pers.json()['id']}", headers=auth,
-                       json={"nombre": "Bici editada", "nivel_intervencion": "personalizada", "parametros": {**PARAMS, "reduccion_kcal_dia": 350}})
-    assert edit.status_code == 200 and edit.json()["nombre"] == "Bici editada"
+                       json={"nombre": "Editado", "nivel_intervencion": "personalizada", "parametros": {**PARAMS, "imc_objetivo": 25.0}})
+    assert edit.status_code == 200 and edit.json()["nombre"] == "Editado"
     guardados = {e["id"]: e for e in cliente.get(base, headers=auth).json()}
-    assert guardados[pers.json()["id"]]["parametros"]["reduccion_kcal_dia"] == 350
+    assert guardados[pers.json()["id"]]["parametros"]["imc_objetivo"] == 25.0
 
     assert cliente.delete(f"{base}/{fijo.json()['id']}", headers=auth).status_code == 204
     assert cliente.delete(f"{base}/{fijo.json()['id']}", headers=auth).status_code == 404
@@ -163,8 +163,7 @@ def test_crud_de_escenarios(cliente, auth, crear_paciente):
 
 
 @pytest.mark.parametrize("cambio", [
-    {"ejercicio_dias": 8}, {"ejercicio_minutos": 181}, {"reduccion_kcal_dia": 1001}, {"reduccion_kcal_dia": -1},
-    {"inicio_anio": 20}, {"duracion_anios": 0}, {"ejercicio_intensidad": "extrema"},
+    {"sedentarismo": "extremo"}, {"imc_objetivo": 11}, {"imc_objetivo": 71}, {"inicio_anio": 20}, {"inicio_anio": -1},
 ])
 def test_escenario_valida_los_parametros(cliente, auth, crear_paciente, cambio):
     pid = crear_paciente()["id"]
@@ -197,7 +196,8 @@ def _con_escenarios(cliente, auth, pid, *definiciones):
 
 NULA = {"nombre": "Sin cambios", "nivel_intervencion": "nula"}
 MODERADA = {"nombre": "Moderada", "nivel_intervencion": "moderada"}
-PERSONAL = {"nombre": "Bici", "nivel_intervencion": "personalizada", "parametros": PARAMS}
+PERSONAL = {"nombre": "Más activo", "nivel_intervencion": "personalizada", "parametros": PARAMS}
+RAPIDA = {"horizonte_anios": 2, "trayectorias": 50}
 
 
 def test_simular_sin_escenarios_da_400(cliente, auth, crear_paciente):
@@ -217,46 +217,57 @@ def test_simular_paciente_inexistente(cliente, auth):
 
 
 def test_simulacion_completa_estructura_e_invariantes(cliente, auth, crear_paciente):
-    p = crear_paciente(glucosa=104, insulina=13, hba1c=5.8, imc=29, peso=None, talla=None)
+    p = crear_paciente(edad=40, imc=33.5, sedentarismo="severo", antecedente_familiar=True)
     _con_escenarios(cliente, auth, p["id"], NULA, MODERADA, PERSONAL)
     r = cliente.post(f"/pacientes/{p['id']}/simular", json={"horizonte_anios": 5, "trayectorias": 100}, headers=auth)
     assert r.status_code == 200
     s = r.json()
-    assert [x["nombre"] for x in s["resultados"]] == ["Sin cambios", "Moderada", "Bici"]
+    assert [x["nombre"] for x in s["resultados"]] == ["Sin cambios", "Moderada", "Más activo"]
     assert s["horizonteAnios"] == 5 and s["trayectorias"] == 100 and s["runId"]
-    assert {v["simbolo"] for v in s["supuestos"]["variablesAleatorias"]} == {"E_cal", "G_act", "T_β", "P_gen"}
+    assert {v["simbolo"] for v in s["supuestos"]["variablesAleatorias"]} == {"X_t", "E_cal_ruido", "T_β", "P_gen", "riesgo_vida", "a_gen"}
     for res in s["resultados"]:
-        assert len(res["resumenAnual"]) == 6
-        assert res["resumenAnual"][0]["glucosa"]["p50"] == 104        # año 0 = laboratorio real
+        assert len(res["serie"]) == 5 * 4 + 1
+        assert res["serie"][0]["glucosa"]["p50"] == 90
         assert 0 <= res["prob5"] <= res["probHorizonte"] <= 100
-        for punto in res["resumenAnual"]:
+        incidencias = [punto["incidencia"] for punto in res["serie"]]
+        assert incidencias == sorted(incidencias)
+        for punto in res["serie"]:
             assert punto["glucosa"]["p10"] <= punto["glucosa"]["p50"] <= punto["glucosa"]["p90"]
             assert sum(punto["etapaPct"].values()) == pytest.approx(100, abs=0.6)
     personal = s["resultados"][2]
-    assert personal["parametros"]["ejercicio_dias"] == 4
-    assert personal["intervencion"]["gActSemana"] > 0                  # el ejercicio se tradujo a kcal con el peso estimado
-    assert personal["intervencion"]["pesoEstimado"] is True
+    assert personal["parametros"]["sedentarismo"] == "activo"
+    assert personal["intervencion"] == {"sedentarismo": "activo", "imc": 27.0, "inicioAnio": 1.0, "cambia": True}
+    assert s["resultados"][0]["intervencion"]["cambia"] is False
+
+
+def test_la_misma_semilla_da_el_mismo_resultado(cliente, auth, crear_paciente):
+    pid = crear_paciente()["id"]
+    _con_escenarios(cliente, auth, pid, NULA)
+    a = cliente.post(f"/pacientes/{pid}/simular", json={**RAPIDA, "semilla": 42}, headers=auth).json()
+    b = cliente.post(f"/pacientes/{pid}/simular", json={**RAPIDA, "semilla": 42}, headers=auth).json()
+    assert a["semilla"] == b["semilla"] == 42
+    assert a["resultados"][0]["serie"] == b["resultados"][0]["serie"]
+
+
+def test_la_intervencion_no_empeora_el_pronostico(cliente, auth, crear_paciente):
+    pid = crear_paciente(edad=40, imc=33.5, sedentarismo="severo", antecedente_familiar=True)["id"]
+    _con_escenarios(cliente, auth, pid, NULA, {"nombre": "Intensiva", "nivel_intervencion": "intensiva"})
+    r = cliente.post(f"/pacientes/{pid}/simular", json={"horizonte_anios": 5, "trayectorias": 50, "semilla": 3}, headers=auth).json()
+    nula, intensiva = r["resultados"]
+    assert intensiva["prob5"] <= nula["prob5"]
 
 
 def test_simular_solo_los_escenarios_pedidos(cliente, auth, crear_paciente):
     pid = crear_paciente()["id"]
     ids = _con_escenarios(cliente, auth, pid, NULA, MODERADA)
-    r = cliente.post(f"/pacientes/{pid}/simular", json={"horizonte_anios": 2, "trayectorias": 50, "escenario_ids": [ids[1]]}, headers=auth)
+    r = cliente.post(f"/pacientes/{pid}/simular", json={**RAPIDA, "escenario_ids": [ids[1]]}, headers=auth)
     assert [x["nombre"] for x in r.json()["resultados"]] == ["Moderada"]
-
-
-def test_usa_el_peso_registrado_y_no_el_estimado(cliente, auth, crear_paciente):
-    pid = crear_paciente(peso=90, talla=170)["id"]
-    _con_escenarios(cliente, auth, pid, PERSONAL)
-    r = cliente.post(f"/pacientes/{pid}/simular", json={"horizonte_anios": 2, "trayectorias": 50}, headers=auth).json()
-    interv = r["resultados"][0]["intervencion"]
-    assert interv["pesoUsado"] == 90 and interv["pesoEstimado"] is False
 
 
 def test_historial_guarda_y_recupera_las_corridas(cliente, auth, crear_paciente):
     pid = crear_paciente()["id"]
     _con_escenarios(cliente, auth, pid, NULA, MODERADA)
-    r1 = cliente.post(f"/pacientes/{pid}/simular", json={"horizonte_anios": 3, "trayectorias": 50}, headers=auth).json()
+    r1 = cliente.post(f"/pacientes/{pid}/simular", json={"horizonte_anios": 3, "trayectorias": 50, "semilla": 9}, headers=auth).json()
     r2 = cliente.post(f"/pacientes/{pid}/simular", json={"horizonte_anios": 4, "trayectorias": 60}, headers=auth).json()
 
     historial = cliente.get(f"/pacientes/{pid}/simulaciones", headers=auth).json()
@@ -264,7 +275,7 @@ def test_historial_guarda_y_recupera_las_corridas(cliente, auth, crear_paciente)
     assert historial[0]["nombresEscenarios"] == ["Sin cambios", "Moderada"]
 
     guardada = cliente.get(f"/pacientes/{pid}/simulaciones/{r1['runId']}", headers=auth).json()
-    assert guardada["horizonteAnios"] == 3
+    assert guardada["horizonteAnios"] == 3 and guardada["semilla"] == 9
     assert [x["prob5"] for x in guardada["resultados"]] == [x["prob5"] for x in r1["resultados"]]
     assert cliente.get(f"/pacientes/{pid}/simulaciones/999999", headers=auth).status_code == 404
 
@@ -272,30 +283,15 @@ def test_historial_guarda_y_recupera_las_corridas(cliente, auth, crear_paciente)
 def test_la_corrida_guardada_no_cambia_si_se_borra_el_escenario(cliente, auth, crear_paciente):
     pid = crear_paciente()["id"]
     ids = _con_escenarios(cliente, auth, pid, NULA)
-    run = cliente.post(f"/pacientes/{pid}/simular", json={"horizonte_anios": 2, "trayectorias": 50}, headers=auth).json()["runId"]
+    run = cliente.post(f"/pacientes/{pid}/simular", json=RAPIDA, headers=auth).json()["runId"]
     cliente.delete(f"/pacientes/{pid}/escenarios/{ids[0]}", headers=auth)
     assert cliente.get(f"/pacientes/{pid}/simulaciones/{run}", headers=auth).json()["resultados"][0]["nombre"] == "Sin cambios"
 
 
-def test_escenario_sin_parametros_de_una_corrida_antigua_sigue_leyendose(cliente, auth, crear_paciente):
-    """Compatibilidad: las corridas guardadas antes de los escenarios configurables no tienen `parametros`."""
-    from app.database import SessionLocal
-    from app.models import SimulationRun
-
-    pid = crear_paciente()["id"]
-    _con_escenarios(cliente, auth, pid, NULA)
-    run = cliente.post(f"/pacientes/{pid}/simular", json={"horizonte_anios": 2, "trayectorias": 50}, headers=auth).json()["runId"]
-    with SessionLocal() as db:
-        corrida = db.get(SimulationRun, run)
-        corrida.resultados = [{k: v for k, v in r.items() if k not in ("parametros", "intervencion")} for r in corrida.resultados]
-        db.commit()
-    assert cliente.get(f"/pacientes/{pid}/simulaciones/{run}", headers=auth).status_code == 200
-
-
 # ============================================================== priorización de riesgo
 def test_riesgo_ordena_por_probabilidad_y_deja_al_final_a_los_no_simulados(cliente, auth, crear_paciente):
-    sano = crear_paciente(nombre="R-Sano", edad=28, imc=22.5, peso=60, talla=163, glucosa=82, insulina=5, hba1c=5.0)
-    riesgoso = crear_paciente(nombre="R-Riesgo", glucosa=112, insulina=18, hba1c=6.0, imc=33)
+    sano = crear_paciente(nombre="R-Sano", edad=65, imc=22.0, sedentarismo="activo", antecedente_familiar=False)
+    riesgoso = crear_paciente(nombre="R-Riesgo", edad=40, imc=33.5, sedentarismo="severo", antecedente_familiar=True)
     nuevo = crear_paciente(nombre="R-SinSimular")
     for p in (sano, riesgoso):
         _con_escenarios(cliente, auth, p["id"], NULA)

@@ -1,14 +1,11 @@
 export type Etapa = "sano" | "resistencia" | "prediabetes" | "diabetes";
+export type Sedentarismo = "activo" | "moderado" | "severo";
 export type NivelIntervencion = "nula" | "moderada" | "intensiva" | "personalizada";
-export type IntensidadEjercicio = "ligera" | "moderada" | "vigorosa";
 
 export interface ParametrosIntervencion {
-  reduccion_kcal_dia: number;
-  ejercicio_dias: number;
-  ejercicio_minutos: number;
-  ejercicio_intensidad: IntensidadEjercicio;
+  sedentarismo: Sedentarismo;
+  imc_objetivo: number | null;
   inicio_anio: number;
-  duracion_anios: number | null;
 }
 
 export interface DatosEscenario {
@@ -43,40 +40,29 @@ export interface CambiosUsuario {
   password?: string;
 }
 
+export interface EstadoPaciente {
+  sI0: number;
+  kVat: number;
+}
+
 export interface Paciente {
   id: number;
   nombre: string;
   edad: number;
-  sexo: string | null;
   imc: number;
-  peso?: number | null;
-  talla?: number | null;
-  glucosa: number;
-  insulina: number;
-  hba1c: number | null;
+  sedentarismo: Sedentarismo;
   antecedente_familiar: boolean | null;
-  hipertension: boolean;
-  tabaquismo: boolean;
   notas: string | null;
   creado_en: string;
-  homaIR: number;
-  etapaActual: Etapa;
-  estadoLatente: EstadoInicial;
+  estadoLatente: EstadoPaciente;
 }
 
 export interface NuevoPaciente {
   nombre: string;
   edad: number;
-  sexo?: string;
   imc: number;
-  peso?: number;
-  talla?: number;
-  glucosa: number;
-  insulina: number;
-  hba1c?: number;
-  antecedente_familiar?: boolean | null;
-  hipertension?: boolean;
-  tabaquismo?: boolean;
+  sedentarismo: Sedentarismo;
+  antecedente_familiar: boolean;
   notas?: string;
 }
 
@@ -95,35 +81,68 @@ export interface BandaValores {
   p90: number;
 }
 
-export interface PuntoAnual {
+export interface PuntoSerie {
   anio: number;
   glucosa: BandaValores;
   insulina: BandaValores;
   homaIR: BandaValores;
-  reserva: BandaValores;
-  sensibilidad?: BandaValores | null;
-  adiposo?: BandaValores | null;
+  homaBeta: BandaValores;
+  deficitBeta: BandaValores;
+  masaBeta: BandaValores;
+  sensibilidad: BandaValores;
+  incidencia: number;
   etapaPct: Record<Etapa, number>;
+}
+
+export interface PuntoTrayectoria {
+  anio: number;
+  glucosa: number;
+  insulina: number;
+  masaBeta: number;
+  sensibilidad: number;
+  homaIR: number;
+  homaBeta: number;
+  deficitBeta: number;
+}
+
+export interface PuntoPreDiagnostico {
+  anio: number;
+  glucosa: BandaValores;
+  n: number;
 }
 
 export interface EstadoInicial {
   sI0: number;
-  cBeta0: number;
-  mAdip0: number;
+  kVat: number;
+  riesgoVida: number;
+  aGen: number;
+}
+
+export interface DescripcionCambio {
+  sedentarismo: Sedentarismo;
+  imc: number;
+  inicioAnio: number;
+  cambia: boolean;
 }
 
 export interface ResultadoEscenario {
   escenarioId: number;
   nombre: string;
   nivelIntervencion: NivelIntervencion;
-  resumenAnual: PuntoAnual[];
+  serie: PuntoSerie[];
+  trayectoriaEjemplo: PuntoTrayectoria[];
+  preDiagnostico: PuntoPreDiagnostico[];
+  tiemposDiagnostico: number[];
   prob5: number;
   probHorizonte: number;
   etapaMediana: Etapa;
-  edadMedianaInflexion: number | null;
+  tiempoMedianoDiagnostico: number | null;
+  edadMedianaDiagnostico: number | null;
+  tiempoLibreAnios: number;
+  sinDiabetesEnHorizonte: boolean;
   estadoInicial: EstadoInicial;
   parametros?: ParametrosIntervencion | null;
-  intervencion?: Record<string, unknown> | null;
+  intervencion: DescripcionCambio;
 }
 
 export interface VariableAleatoria {
@@ -145,6 +164,7 @@ export interface SimulateResponse {
   pacienteId: number;
   horizonteAnios: number;
   trayectorias: number;
+  semilla: number;
   resultados: ResultadoEscenario[];
   supuestos: Supuestos;
 }
@@ -169,6 +189,6 @@ export interface PacienteRiesgo {
   nombre: string;
   edad: number;
   imc: number;
-  etapaActual: Etapa;
+  sedentarismo: Sedentarismo;
   ultimaSimulacion: UltimaSimulacionResumen | null;
 }

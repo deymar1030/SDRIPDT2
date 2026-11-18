@@ -1,62 +1,42 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { ArrowDown, ArrowRight, Calculator, FlaskConical, RefreshCw, TriangleAlert } from "lucide-react";
+import { FlaskConical, TriangleAlert } from "lucide-react";
 import { PublicLayout } from "../components/PublicLayout";
-import { COLOR_ETAPA, StageBadge } from "../components/StageBadge";
-import { BotonEnlace, Campo, Entrada, Unidad, tinta } from "../components/ui";
+import { BotonEnlace, Campo, Entrada, Selector } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
 import { inicioPorRol } from "../lib/roles";
-import type { Etapa } from "../types";
+import { NOMBRE_SEDENTARISMO, SEDENTARISMO, tasaDesgasteAdiposo } from "../lib/perfil";
+import type { Sedentarismo } from "../types";
 
-/* =====================================================================
-   Esta página explica, paso a paso, lo que hace backend/app/engine.py.
-   Las constantes de abajo son copia de las del motor: si se recalibra
-   el motor, hay que actualizarlas aquí también.
-   ===================================================================== */
+/* Las constantes de esta página son copia de backend/app/motor/parametros.py. */
 const K = {
-  G_BASAL: 85,
-  K5: 1.5,
-  D_INS_BASAL: 6,
-  I_SEC_MAX: 60,
-  K_CAL: 7700,
-  G_ACT_MAX: 3500,
-  K2: 3.68e-6,
-  K6: 0.00483,
-  K6B: 2.09e-5,
-  K7: 0.00207,
-  T_BETA_BASAL: 3e-5,
-  C_BETA_DIABETES: 8.4,
-  MARGEN_C_BETA: 6.4,
-  ALPHA_GEN: 1.4,
-  THETA_UMB: 0.5,
-  P_GEN: 0.35,
+  G_IDEAL: 90,
+  I_IDEAL: 10,
+  BETA_0: 1000,
+  E_G0: 1.4,
+  SIGMA_MAX: 50,
+  ALPHA: 300,
+  V_I: 12,
+  D_0: -0.05,
+  R_1: 0.001,
+  Y_DMT2: 126,
+  K_VAT_BASE: 0.015,
 };
-const PISO_C_BETA: Record<Etapa, number> = { sano: 60, resistencia: 18.4, prediabetes: 11, diabetes: 0 };
 
-const clip = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
-
-function etapaClinica(glucosa: number, hba1c: number | null, homa: number): Etapa {
-  if (glucosa >= 126 || (hba1c !== null && hba1c >= 6.5)) return "diabetes";
-  if (glucosa >= 100 || (hba1c !== null && hba1c >= 5.7)) return "prediabetes";
-  if (homa >= 2.5) return "resistencia";
-  return "sano";
-}
-
-/* ---------------- piezas de presentación ---------------- */
+const RIESGO_VIDA: Record<Sedentarismo, [number, number]> = { activo: [0.5, 0.7], moderado: [0.9, 1.1], severo: [1.4, 1.8] };
 
 const SECCIONES = [
   { id: "resumen", titulo: "Visión general" },
-  { id: "entradas", titulo: "1. Datos del paciente" },
-  { id: "estado-inicial", titulo: "2. Estado inicial" },
-  { id: "aleatorias", titulo: "3. Variables aleatorias" },
-  { id: "intervencion", titulo: "4. Escenarios" },
-  { id: "paso-semanal", titulo: "5. El paso semanal" },
-  { id: "etapas", titulo: "6. Clasificación" },
-  { id: "monte-carlo", titulo: "7. De trayectorias a pronóstico" },
-  { id: "parametros", titulo: "8. Parámetros" },
+  { id: "entradas", titulo: "1. Entradas del paciente" },
+  { id: "aleatorias", titulo: "2. Variables aleatorias" },
+  { id: "ecuaciones", titulo: "3. Ecuaciones del modelo" },
+  { id: "integracion", titulo: "4. Integración en el tiempo" },
+  { id: "escenarios", titulo: "5. Escenarios" },
+  { id: "salidas", titulo: "6. Resultados y gráficas" },
+  { id: "parametros", titulo: "7. Parámetros" },
+  { id: "codigo", titulo: "8. Dónde está en el código" },
   { id: "limitaciones", titulo: "9. Alcances y límites" },
 ];
 
-/** Variable con subíndice: <V s="I">S</V> → S_I */
 function V({ children, s }: { children: ReactNode; s?: ReactNode }) {
   return (
     <span className="whitespace-nowrap italic">
@@ -104,8 +84,7 @@ function Tabla({ cabecera, filas }: { cabecera: string[]; filas: ReactNode[][] }
   );
 }
 
-/** Mini gráfico de la forma de cada distribución. */
-function FormaDistribucion({ tipo }: { tipo: "normal" | "uniforme" | "gamma" | "bernoulli" }) {
+function FormaDistribucion({ tipo }: { tipo: "normal" | "uniforme" | "gamma" | "weibull" | "bernoulli" }) {
   const trazo = "stroke-hud-acento";
   return (
     <svg viewBox="0 0 80 36" className="h-9 w-20" aria-hidden="true">
@@ -113,6 +92,7 @@ function FormaDistribucion({ tipo }: { tipo: "normal" | "uniforme" | "gamma" | "
       {tipo === "normal" && <path d="M4 33 C 22 33, 28 4, 40 4 S 58 33, 76 33" fill="none" className={trazo} strokeWidth="2" />}
       {tipo === "uniforme" && <path d="M14 33 V 12 H 66 V 33" fill="none" className={trazo} strokeWidth="2" />}
       {tipo === "gamma" && <path d="M4 33 C 10 33, 14 5, 22 5 S 40 26, 76 31" fill="none" className={trazo} strokeWidth="2" />}
+      {tipo === "weibull" && <path d="M4 33 C 16 33, 30 4, 42 5 S 56 20, 62 33" fill="none" className={trazo} strokeWidth="2" />}
       {tipo === "bernoulli" && (
         <>
           <rect x="18" y="12" width="12" height="21" className="fill-hud-acento/60" />
@@ -125,175 +105,77 @@ function FormaDistribucion({ tipo }: { tipo: "normal" | "uniforme" | "gamma" | "
   );
 }
 
-/* ---------------- calculadora del estado inicial ---------------- */
-
 function Resultado({ etiqueta, valor, nota }: { etiqueta: ReactNode; valor: ReactNode; nota?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3 border-t border-hud-borde py-2 first:border-t-0">
       <span className="text-sm text-hud-suave">{etiqueta}</span>
       <span className="text-right">
-        <span className="font-mono font-semibold text-white">{valor}</span>
+        <span className="font-mono text-sm font-semibold text-white">{valor}</span>
         {nota && <span className="block text-[11px] text-hud-tenue">{nota}</span>}
       </span>
     </div>
   );
 }
 
-function CalculadoraEstadoInicial() {
-  // Valores ilustrativos de un caso típico de prediabetes (no son datos de ningún paciente).
-  const [glucosa, setGlucosa] = useState("108");
-  const [insulina, setInsulina] = useState("15");
-  const [imc, setImc] = useState("31");
-  const [hba1c, setHba1c] = useState("5.9");
+function CalculadoraPerfil() {
+  const [imc, setImc] = useState("33.5");
+  const [sedentarismo, setSedentarismo] = useState<Sedentarismo>("severo");
 
-  const r = useMemo(() => {
-    const g = parseFloat(glucosa), i = parseFloat(insulina), b = parseFloat(imc);
-    const a = hba1c.trim() === "" ? null : parseFloat(hba1c);
-    if (!(g > 0) || !(i > 0) || !(b > 0)) return null;
-    const iSec0 = Math.max(i, 0.5);
-    const deficit = Math.max(0, (g - K.G_BASAL) / K.K5);
-    const dIns0 = clip(iSec0 + deficit, 2, 60);
-    const sI0 = clip(K.D_INS_BASAL / dIns0, 0.05, 1.5);
-    const cBetaBruta = deficit < 1 ? 100 : clip((100 * iSec0) / K.I_SEC_MAX, 5, 100);
-    const homa = (g * i) / 405;
-    const etapa = etapaClinica(g, a !== null && !Number.isNaN(a) ? a : null, homa);
-    const piso = etapa === "diabetes" ? PISO_C_BETA[etapa] : Math.max(PISO_C_BETA[etapa], K.C_BETA_DIABETES + K.MARGEN_C_BETA);
-    const cBeta0 = Math.max(cBetaBruta, piso);
-    const mAdip0 = clip((b - 22) * 2.5, 0, 80);
-    const gAct = clip(1200 - (b - 22) * 40, 100, 1200);
-    return { iSec0, deficit, dIns0, sI0, cBetaBruta, cBeta0, piso, homa, etapa, mAdip0, gAct, eCal: gAct / 7 };
-  }, [glucosa, insulina, imc, hba1c]);
+  const calculo = useMemo(() => {
+    const valor = parseFloat(imc);
+    if (!valor || valor < 12 || valor > 70) return null;
+    const s0 = Math.max(0.5, 1.8 - (valor - 22) * 0.05);
+    return { s0, k: tasaDesgasteAdiposo(sedentarismo, valor) };
+  }, [imc, sedentarismo]);
+
+  const [bajo, alto] = RIESGO_VIDA[sedentarismo];
 
   return (
-    <div className="rounded-2xl border border-hud-borde-fuerte bg-hud-panel/80 p-5 shadow-[var(--sombra-panel)]">
-      <div className="flex items-center gap-2">
-        <Calculator size={17} className="text-hud-acento" />
-        <p className="font-semibold text-white">Pruébalo: calcula el estado inicial</p>
+    <div className="rounded-xl border border-hud-borde-fuerte bg-hud-panel/60 p-5">
+      <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-300">Pruébalo: del perfil al estado inicial</p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Campo etiqueta="IMC" htmlFor="calc-imc">
+          <Entrada id="calc-imc" type="number" step="0.1" value={imc} onChange={(e) => setImc(e.target.value)} />
+        </Campo>
+        <Campo etiqueta="Sedentarismo" htmlFor="calc-sed">
+          <Selector id="calc-sed" value={sedentarismo} onChange={(e) => setSedentarismo(e.target.value as Sedentarismo)}>
+            {SEDENTARISMO.map((n) => <option key={n} value={n}>{NOMBRE_SEDENTARISMO[n]}</option>)}
+          </Selector>
+        </Campo>
       </div>
-      <p className="mt-1 text-sm text-hud-tenue">Valores ilustrativos de un caso típico de prediabetes. Cámbialos y mira cómo se recalcula todo.</p>
-
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Campo etiqueta={<>Glucosa <Unidad>mg/dL</Unidad></>} htmlFor="c-glu"><Entrada id="c-glu" type="number" value={glucosa} onChange={(e) => setGlucosa(e.target.value)} /></Campo>
-        <Campo etiqueta={<>Insulina <Unidad>µU/mL</Unidad></>} htmlFor="c-ins"><Entrada id="c-ins" type="number" step="0.1" value={insulina} onChange={(e) => setInsulina(e.target.value)} /></Campo>
-        <Campo etiqueta="IMC" htmlFor="c-imc"><Entrada id="c-imc" type="number" step="0.1" value={imc} onChange={(e) => setImc(e.target.value)} /></Campo>
-        <Campo etiqueta="HbA1c %" htmlFor="c-a1c"><Entrada id="c-a1c" type="number" step="0.1" value={hba1c} onChange={(e) => setHba1c(e.target.value)} placeholder="opcional" /></Campo>
-      </div>
-
-      {r ? (
-        <div className="mt-5 grid gap-5 md:grid-cols-2">
-          <div className="rounded-xl border border-hud-borde bg-hud-fondo/40 px-4 py-2">
-            <Resultado etiqueta={<>HOMA-IR = G·I / 405</>} valor={r.homa.toFixed(2)} />
-            <Resultado etiqueta="Etapa clínica de hoy" valor={<StageBadge etapa={r.etapa} />} />
-            <Resultado etiqueta={<>Déficit = max(0, (G − 85) / 1.5)</>} valor={r.deficit.toFixed(2)} nota="µU/mL de insulina que “faltan”" />
-            <Resultado etiqueta={<><V s="ins">D</V>(0) = <V s="sec">I</V>(0) + déficit</>} valor={r.dIns0.toFixed(2)} nota="demanda de insulina" />
-          </div>
-          <div className="rounded-xl border border-hud-borde bg-hud-fondo/40 px-4 py-2">
-            <Resultado etiqueta={<><V s="I">S</V>(0) = 6 / <V s="ins">D</V>(0)</>} valor={r.sI0.toFixed(3)} nota={`${Math.round(r.sI0 * 100)}% de sensibilidad normal`} />
-            <Resultado
-              etiqueta={<><V s="β">C</V>(0) reserva pancreática</>}
-              valor={`${r.cBeta0.toFixed(0)}%`}
-              nota={r.cBeta0 > r.cBetaBruta ? `bruto ${r.cBetaBruta.toFixed(0)}% → piso ${r.piso.toFixed(1)}%` : r.deficit < 1 ? "sin déficit → reserva sana" : "100·I_sec / 60"}
-            />
-            <Resultado etiqueta={<><V s="adip">M</V>(0) = (IMC − 22)·2.5</>} valor={`${r.mAdip0.toFixed(1)} kg`} nota="grasa acumulada sobre lo saludable" />
-            <Resultado etiqueta={<>Línea base <V s="act">G</V> / <V s="cal">E</V></>} valor={`${r.gAct.toFixed(0)} / ${r.eCal.toFixed(0)}`} nota="kcal/semana · kcal/día" />
-          </div>
-        </div>
-      ) : (
-        <p className="mt-4 text-sm text-hud-tenue">Completa glucosa, insulina e IMC con valores positivos.</p>
-      )}
-    </div>
-  );
-}
-
-/* ---------------- diagrama del paso semanal ---------------- */
-
-function Nodo({ titulo, sub, regla, color = "#22d3ee" }: { titulo: string; sub: string; regla?: string; color?: string }) {
-  return (
-    <div className="relative min-w-0 flex-1 rounded-xl border bg-hud-panel/90 px-3 py-2.5 text-center" style={{ borderColor: `${color}66` }}>
-      {regla && (
-        <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full border bg-hud-fondo px-1.5 font-mono text-[10px] font-bold" style={{ borderColor: `${color}88`, color: tinta(color) }}>
-          {regla}
-        </span>
-      )}
-      <p className="text-sm font-semibold text-white">{titulo}</p>
-      <p className="text-[11px] text-hud-tenue">{sub}</p>
-    </div>
-  );
-}
-
-function Flecha() {
-  return (
-    <div className="flex items-center justify-center text-hud-tenue">
-      <ArrowRight size={16} className="hidden md:block" />
-      <ArrowDown size={16} className="md:hidden" />
-    </div>
-  );
-}
-
-function DiagramaCausal() {
-  return (
-    <div className="rounded-2xl border border-hud-borde bg-hud-panel/60 p-5">
-      <div className="flex flex-col gap-3 md:flex-row md:items-stretch">
-        <Nodo titulo="Balance energético" sub="7·E_cal − G_act" />
-        <Flecha />
-        <Nodo titulo="Grasa M_adip" sub="se acumula" regla="R1" color="#facc15" />
-        <Flecha />
-        <Nodo titulo="Sensibilidad S_I" sub="baja" regla="R2" color="#fb923c" />
-        <Flecha />
-        <Nodo titulo="Reserva C_β" sub="se agota" regla="R4" color="#f472b6" />
-        <Flecha />
-        <Nodo titulo="Glucosa" sub="sube" regla="R3" color="#f43f5e" />
-      </div>
-      <div className="mt-4 flex items-start gap-2 rounded-lg border border-dashed border-rose-400/50 px-3 py-2 text-sm text-hud-suave">
-        <RefreshCw size={15} className="mt-0.5 flex-shrink-0 text-rose-400" />
-        <span>
-          <b className="text-white">R6 · Retroalimentación:</b> si la glucosa supera 100 mg/dL, acelera el agotamiento de las células β y
-          reduce aún más la sensibilidad — por eso la progresión se acelera una vez que empieza.
-          <b className="text-white"> R7</b> (intervención) actúa en sentido contrario, devolviendo sensibilidad.
-        </span>
+      <div className="mt-4">
+        {calculo ? (
+          <>
+            <Resultado etiqueta={<>Sensibilidad inicial <V s="I0">S</V></>} valor={calculo.s0.toFixed(3)} nota="max(0.5, 1.8 − (IMC − 22) · 0.05)" />
+            <Resultado etiqueta={<>Desgaste adiposo <V s="VAT">k</V></>} valor={calculo.k.toFixed(5)} nota="0.015 · factor · (1 + exceso de IMC · impacto)" />
+            <Resultado etiqueta="Resiliencia riesgo_vida" valor={`U(${bajo}, ${alto})`} nota="se sortea una vez por trayectoria" />
+          </>
+        ) : (
+          <p className="text-sm text-hud-tenue">Ingresa un IMC entre 12 y 70.</p>
+        )}
       </div>
     </div>
   );
 }
-
-/** Ilustración estática de cómo se leen las bandas del gráfico de trayectorias. */
-function IlustracionBandas() {
-  return (
-    <svg viewBox="0 0 320 140" className="w-full max-w-md" role="img" aria-label="Ilustración: banda del percentil 10 al 90 alrededor de la mediana">
-      <line x1="20" y1="120" x2="310" y2="120" className="stroke-hud-borde-fuerte" />
-      <line x1="20" y1="10" x2="20" y2="120" className="stroke-hud-borde-fuerte" />
-      <path d="M20 95 C 90 92, 150 70, 200 45 S 280 18, 310 14 L 310 60 C 270 70, 230 85, 190 95 S 90 104, 20 98 Z" className="fill-hud-acento/20" />
-      <path d="M20 96 C 100 96, 160 85, 210 68 S 285 42, 310 36" fill="none" className="stroke-hud-acento" strokeWidth="2.5" />
-      <text x="232" y="22" className="fill-hud-suave text-[10px]">percentil 90</text>
-      <text x="236" y="88" className="fill-hud-suave text-[10px]">percentil 10</text>
-      <text x="120" y="80" className="fill-white text-[10px] font-semibold">mediana (p50)</text>
-      <text x="290" y="134" className="fill-hud-tenue text-[9px]">años</text>
-    </svg>
-  );
-}
-
-/* ---------------- página ---------------- */
 
 export default function ComoFunciona() {
   const { usuario } = useAuth();
 
   return (
     <PublicLayout>
-      {/* Encabezado */}
       <section className="border-b border-hud-borde bg-hud-panel/40">
         <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:py-16">
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-300">Metodología</p>
           <h1 className="mt-2 max-w-3xl text-3xl font-bold leading-tight text-white sm:text-4xl">Cómo funciona la simulación</h1>
           <p className="mt-4 max-w-3xl text-lg text-hud-suave">
-            El pronóstico sale de un modelo de <b className="text-white">dinámica de sistemas en tiempo discreto</b> (Δt = 1 semana)
-            combinado con <b className="text-white">simulación Monte Carlo</b>: se generan cientos de futuros posibles del mismo
-            paciente y se resumen en probabilidades. Aquí está el procedimiento completo, con las fórmulas que usa el motor.
+            El pronóstico sale de un sistema de <b className="text-white">ecuaciones diferenciales</b> (modelo de Topp et al.) integrado con el
+            método de <b className="text-white">Euler</b> y repetido con <b className="text-white">simulación Monte Carlo</b>: se generan
+            cientos de futuros posibles del mismo paciente y se resumen en probabilidades.
           </p>
         </div>
       </section>
 
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[220px_1fr]">
-        {/* Índice */}
         <aside className="hidden lg:block">
           <nav className="sticky top-24 space-y-0.5 border-l border-hud-borde" aria-label="Contenido">
             {SECCIONES.map((s) => (
@@ -305,17 +187,16 @@ export default function ComoFunciona() {
         </aside>
 
         <article className="min-w-0 space-y-12 pb-10">
-          {/* Visión general */}
           <section id="resumen" className="scroll-mt-24">
             <h2 className="text-2xl font-bold text-white">Visión general</h2>
             <p className="mt-3 text-hud-suave">Cada vez que presionas “Ejecutar simulación” ocurre lo siguiente, para cada escenario:</p>
             <ol className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
               {[
-                ["Datos del paciente", "Labs de hoy, IMC, antecedentes"],
-                ["Estado inicial", "S_I, C_β y M_adip estimados"],
-                ["Bucle semanal", "52 × años · reglas R1–R7"],
-                ["Clasificación", "Etapa de cada trayectoria"],
-                ["Resumen", "Percentiles y probabilidades"],
+                ["Paciente virtual", "Edad, IMC, sedentarismo y antecedentes"],
+                ["Sorteo", "Weibull, Normal, Gamma, Bernoulli y Uniforme"],
+                ["Bucle de Euler", "5 pasos por día · Ecuaciones 1 a 5"],
+                ["Parada", "Se detiene al llegar a 126 mg/dL"],
+                ["Resumen", "Percentiles, probabilidades y gráficas"],
               ].map(([t, d], i) => (
                 <li key={t} className="relative rounded-xl border border-hud-borde bg-hud-panel/80 p-4 shadow-[var(--sombra-panel)]">
                   <span className="font-mono text-xs text-hud-acento">0{i + 1}</span>
@@ -325,265 +206,166 @@ export default function ComoFunciona() {
               ))}
             </ol>
             <p className="mt-4 text-sm text-hud-tenue">
-              Cada una de las M trayectorias (100, 200 o 500) parte del <i>mismo</i> estado inicial; lo único que las diferencia es el camino
-              aleatorio que toman: cuánto come y se mueve el paciente cada semana, la velocidad de agotamiento de su páncreas y, si no se
-              conoce, su predisposición genética.
+              Cada trayectoria parte de la homeostasis ideal (glucosa {K.G_IDEAL} mg/dL, insulina {K.I_IDEAL} µU/mL, masa beta {K.BETA_0}); lo que
+              las diferencia es el azar de cada una: su envejecimiento, su fluctuación metabólica, la velocidad de muerte de sus células β y, si no
+              se conoce, su herencia.
             </p>
           </section>
 
-          {/* 1. Entradas */}
-          <Seccion id="entradas" eyebrow="Paso 1" titulo="Datos del paciente">
-            <p>El modelo solo necesita lo que se mide en una consulta habitual:</p>
+          <Seccion id="entradas" eyebrow="Paso 1 · Informe 3.1 y 3.3" titulo="Entradas del paciente">
+            <p>El modelo solo pide cinco datos:</p>
             <Tabla
               cabecera={["Dato", "Para qué se usa"]}
               filas={[
-                ["Glucosa en ayunas (mg/dL)", "Etapa clínica de hoy y déficit de insulina → sensibilidad y reserva iniciales."],
-                ["Insulina en ayunas (µU/mL)", "Es la secreción observada I_sec(0); junto con la glucosa da el HOMA-IR."],
-                ["HbA1c (%) · opcional", "Solo para la etapa clínica de hoy (prediabetes ≥ 5.7, diabetes ≥ 6.5)."],
-                ["IMC", "Grasa acumulada inicial M_adip(0) y nivel de actividad de referencia."],
-                ["Antecedente familiar de DMT2", "Fija P_gen en 1 o 0; si no se sabe, se sortea con probabilidad 0.35."],
-                ["Edad", "Para expresar el punto de inflexión como edad del paciente."],
+                ["Nombre", "Identifica al paciente."],
+                ["Edad", "Fija la fracción de vida transcurrida que alimenta el envejecimiento X_t, y la edad de diagnóstico."],
+                ["IMC", "Define la sensibilidad inicial S_I0 y, con el sedentarismo, la tasa de desgaste adiposo k_VAT."],
+                ["Sedentarismo (activo, moderado, severo)", "Define k_VAT y el rango de la resiliencia de estilo de vida."],
+                ["Antecedentes familiares (sí / no)", "Con herencia, el daño a las células β se amplifica entre 1.2 y 1.6 veces."],
               ]}
             />
+            <Formula etiqueta="sensibilidad inicial"><V s="I0">S</V> = max(0.5, 1.8 − (IMC − 22) · 0.05)</Formula>
+            <Formula etiqueta="desgaste adiposo"><V s="VAT">k</V> = 0.015 · <V s="base">f</V> · (1 + max(0, IMC − 22) · <V s="imc">i</V>)</Formula>
+            <CalculadoraPerfil />
           </Seccion>
 
-          {/* 2. Estado inicial */}
-          <Seccion id="estado-inicial" eyebrow="Paso 2" titulo="Estimar el estado inicial (oculto)">
-            <p>
-              El modelo trabaja con tres variables que no se miden directamente — la <b className="text-white">sensibilidad a la insulina</b>{" "}
-              <V s="I">S</V>, la <b className="text-white">reserva de células β</b> <V s="β">C</V> y la <b className="text-white">grasa acumulada</b>{" "}
-              <V s="adip">M</V>. Se infieren de los labs de hoy de forma que, al recalcularlas con las fórmulas del modelo, se reproduzcan la glucosa y
-              la insulina medidas:
-            </p>
-            <Formula etiqueta="secreción observada"><V s="sec">I</V>(0) = insulina medida</Formula>
-            <Formula etiqueta="déficit">déficit = max(0, (G − 85) / <V s="5">k</V>) , <V s="5">k</V> = 1.5</Formula>
-            <Formula etiqueta="demanda"><V s="ins">D</V>(0) = <V s="sec">I</V>(0) + déficit</Formula>
-            <Formula etiqueta="sensibilidad"><V s="I">S</V>(0) = <V s="ins,basal">D</V> / <V s="ins">D</V>(0) , <V s="ins,basal">D</V> = 6</Formula>
-            <Formula etiqueta="reserva β"><V s="β">C</V>(0) = 100 · <V s="sec">I</V>(0) / <V s="sec,max">I</V> si hay déficit; 100 % si no</Formula>
-            <Formula etiqueta="grasa"><V s="adip">M</V>(0) = (IMC − 22) · 2.5 kg</Formula>
-            <p className="text-sm">
-              La lógica: si hay glucosa de más es porque el páncreas ya está secretando todo lo que puede, así que la reserva se lee directamente de
-              la insulina medida. Para no partir de reservas irrealmente bajas se aplica un <b className="text-white">piso por etapa</b>:{" "}
-              sano 60 %, resistencia 18.4 %, prediabetes 11 %; y quien hoy no es diabético nunca arranca por debajo de 14.8 % (el umbral de diabetes más un margen), para que una insulina baja no lo «diabetice» al instante (valores ajustados en la calibración).
-            </p>
-            <CalculadoraEstadoInicial />
-          </Seccion>
-
-          {/* 3. Variables aleatorias */}
-          <Seccion id="aleatorias" eyebrow="Paso 3" titulo="Las variables aleatorias">
-            <p>
-              Son la fuente de incertidumbre del modelo. <V s="cal">E</V> y <V s="act">G</V> se sortean de nuevo cada semana; <V s="β">T</V> y <V s="gen">P</V> se
-              sortean <b className="text-white">una sola vez por trayectoria</b>, porque son rasgos propios de cada persona (qué tan rápido se le desgasta el
-              páncreas, su herencia) y no cambian de una semana a otra:
-            </p>
+          <Seccion id="aleatorias" eyebrow="Paso 2 · Informe 3.2.1" titulo="Variables aleatorias">
+            <p>Cinco distribuciones de probabilidad alimentan al modelo; todas se generan con NumPy.</p>
             <div className="grid gap-3 sm:grid-cols-2">
               {[
-                { tipo: "normal" as const, simbolo: <V s="cal">E</V>, nombre: "Ingesta calórica diaria", dist: "Normal(μ = E_base, σ = 100)", nota: "E_base = G_base / 7 kcal/día" },
-                { tipo: "uniforme" as const, simbolo: <V s="act">G</V>, nombre: "Gasto por actividad física semanal", dist: "Uniforme[G_base − 300, G_base + 300]", nota: "G_base = 1200 − 40·(IMC − 22) kcal/semana" },
-                { tipo: "gamma" as const, simbolo: <V s="β">T</V>, nombre: "Tasa de agotamiento de células β", dist: "Gamma(forma = 2, escala = 0.00011)", nota: "media ≈ 0.00022 por semana · una vez por trayectoria" },
-                { tipo: "bernoulli" as const, simbolo: <V s="gen">P</V>, nombre: "Predisposición genética", dist: "Bernoulli(p = 0.35)", nota: "o fijo 0/1 si se conoce el antecedente" },
-              ].map((v) => (
-                <div key={v.nombre} className="flex gap-4 rounded-xl border border-hud-borde bg-hud-panel/80 p-4 shadow-[var(--sombra-panel)]">
-                  <FormaDistribucion tipo={v.tipo} />
+                ["weibull", "X_t · Envejecimiento y riesgo", "Weibull, κ = 2.5", "X_t = min(W · (t/T + edad/100) · riesgo_vida, 2)"],
+                ["normal", "E_cal_ruido · Fluctuación metabólica", "Normal, μ = 1, σ = 0.05", "Multiplica el desgaste de S_I en cada paso"],
+                ["gamma", "T_β · Variabilidad de muerte celular", "Gamma, k = 2, θ = 0.5", "Multiplica la apoptosis de las células β"],
+                ["bernoulli", "P_gen · Factor genético", "Bernoulli, p = 0.35", "Si el antecedente es desconocido; si se informa, queda fijo"],
+                ["uniforme", "riesgo_vida y a_gen", "Uniforme por nivel", "activo U(0.5, 0.7) · moderado U(0.9, 1.1) · severo U(1.4, 1.8) · a_gen U(1.2, 1.6)"],
+              ].map(([forma, titulo, dist, uso]) => (
+                <div key={titulo} className="flex gap-3 rounded-xl border border-hud-borde bg-hud-panel/60 p-4">
+                  <FormaDistribucion tipo={forma as "normal"} />
                   <div className="min-w-0">
-                    <p className="font-serif text-lg text-white">{v.simbolo}</p>
-                    <p className="text-sm font-medium text-hud-texto">{v.nombre}</p>
-                    <p className="mt-1 font-mono text-xs text-cyan-200">{v.dist}</p>
-                    <p className="text-xs text-hud-tenue">{v.nota}</p>
+                    <p className="font-semibold text-white">{titulo}</p>
+                    <p className="font-mono text-xs text-hud-acento">{dist}</p>
+                    <p className="mt-1 text-xs text-hud-tenue">{uso}</p>
                   </div>
                 </div>
               ))}
             </div>
-            <p className="text-sm">
-              La línea base está construida para que, en el escenario “sin cambios”, el balance energético sea en promedio cero (7·E_base = G_base): mantener los
-              hábitos no implica subir de peso por construcción. A mayor IMC, menor actividad de referencia (proxy de sedentarismo). Además, la sensibilidad
-              inicial de cada trayectoria recibe un pequeño ruido <V s="I">S</V>(0) + Normal(0, 0.05).
+          </Seccion>
+
+          <Seccion id="ecuaciones" eyebrow="Paso 3 · Informe 3.2.2" titulo="Ecuaciones del modelo">
+            <p>Cuatro variables de estado evolucionan juntas: sensibilidad <V s="I">S</V>, masa beta β, insulina <V>I</V> y glucosa <V>G</V>.</p>
+            <h3 className="font-semibold text-white">Ecuación 1 · Degradación de la sensibilidad</h3>
+            <Formula etiqueta="Ec. 1">d<V s="I">S</V> = −<V s="VAT">k</V> · <V s="cal">E</V> · <V s="I">S</V> · <V s="t">X</V></Formula>
+            <h3 className="font-semibold text-white">Ecuación 2 · Glucotoxicidad</h3>
+            <Formula etiqueta="Ec. 2">mult = 1 (G ≤ 105) · 1.5 (≤ 115) · 3 (&lt; 126) · 10 (≥ 126), cada uno × <V s="gen">a</V> · <V s="β">T</V></Formula>
+            <h3 className="font-semibold text-white">Ecuación 3 · Masa de células beta</h3>
+            <Formula etiqueta="Ec. 3">dβ = β · (<V s="0">d</V> + <V s="1">r</V> · G − <V s="2">r</V> · mult · G²)</Formula>
+            <h3 className="font-semibold text-white">Ecuación 4 · Insulina</h3>
+            <Formula etiqueta="Ec. 4">d<V>I</V> = β · σ(G) / <V s="I">V</V> − <V s="I">k</V> · <V>I</V> , σ(G) = σ<sub>max</sub> · G² / (α² + G²)</Formula>
+            <h3 className="font-semibold text-white">Ecuación 5 · Glucosa</h3>
+            <Formula etiqueta="Ec. 5">d<V>G</V> = <V s="0">R</V> − <V s="G0">E</V> · G − <V s="I">S</V> · <V>I</V> · G</Formula>
+            <h3 className="font-semibold text-white">Ecuación 6 · Condición de parada</h3>
+            <Formula etiqueta="Ec. 6"><V s="diag">T</V> = tiempo del primer paso con G ≥ 126 mg/dL</Formula>
+            <p>
+              Antes de empezar, <V s="0">R</V>, <V s="I">k</V> y <V s="2">r</V> se calculan para que G = 90 e I = 10 sean un equilibrio exacto con la
+              sensibilidad inicial del paciente. Mientras la sensibilidad cae, la insulina compensa; cuando la glucosa pasa de 105 mg/dL empieza la
+              glucotoxicidad y las células β colapsan: de ahí el quiebre brusco antes del diagnóstico.
             </p>
           </Seccion>
 
-          {/* 4. Intervención */}
-          <Seccion id="intervencion" eyebrow="Paso 4" titulo="Escenarios de intervención">
+          <Seccion id="integracion" eyebrow="Paso 4 · Informe 3.2.2" titulo="Integración en el tiempo">
             <p>
-              Un escenario es un “¿y si…?” sobre los hábitos del paciente. Se arma en un panel con tres bloques y <b className="text-white">no agrega variables
-              aleatorias</b>: solo desplaza los sorteos de <V s="cal">E</V> y <V s="act">G</V> y regula la recuperación R7.
+              Las ecuaciones se resuelven con el método de Euler hacia adelante. Cada día se divide en 5 pasos (Δt = 1/150 de mes) para que la
+              insulina, que reacciona rápido, no oscile. Las trayectorias se calculan todas a la vez, en paralelo, con NumPy.
             </p>
             <Tabla
-              cabecera={["Bloque", "Qué elige el usuario", "Cómo entra al modelo"]}
+              cabecera={["Elemento", "Valor"]}
               filas={[
-                ["Alimentación", "Reducción en kcal/día (ej. sin gaseosas −150, porciones −300, plan hipocalórico −500)", "Se resta a cada sorteo de E_cal"],
-                ["Actividad física", "Tipo (caminar 3.5 MET, bicicleta 6, correr 8.5), días por semana y minutos por sesión", "kcal/semana = días·min·MET·3.5·peso/200, se suman a G_act"],
-                ["Calendario", "Año de inicio y duración (o hasta el final)", "Fuera de esa ventana vuelve a sus hábitos basales"],
+                ["Paso de integración", "1/5 de día"],
+                ["Registro de resultados", "cada trimestre (4 puntos por año)"],
+                ["Año", "365 días"],
+                ["Horizonte", "1 a 20 años, a elección"],
+                ["Fracción de vida del envejecimiento", "paso / (95 − edad en pasos) + edad / 100"],
               ]}
             />
-            <Formula etiqueta="dosis de R7">
-              dosis = ½ · min(1, kcal/día ÷ 500) + ½ · min(1, MET·min/semana ÷ 600) ; k<sub>7,efectivo</sub> = 0.00207 · dosis
-            </Formula>
-            <p className="text-sm">
-              500 kcal/día es el déficit de referencia de la práctica clínica (≈ 0.5 kg por semana) y 600 MET·min/semana el umbral de actividad de la OMS.
-              Las plantillas <i>Moderada</i> (−300 kcal/día, caminar 5×30 min) e <i>Intensiva</i> (−500 kcal/día, bicicleta 5×45 min) solo rellenan el panel.
-              La intervención deja de aplicarse en una trayectoria una vez que esta llega a diabetes, y con intervención activa la grasa sí puede disminuir.
-              Los escenarios creados antes de este panel conservan la tabla fija original (−15 % / +500 kcal y −30 % / +1200 kcal del excedente).
-            </p>
+            <p className="text-sm text-hud-tenue">El comportamiento del modelo no depende del horizonte elegido: un horizonte corto solo recorta la película.</p>
           </Seccion>
 
-          {/* 5. Paso semanal */}
-          <Seccion id="paso-semanal" eyebrow="Paso 5" titulo="El paso semanal: reglas R1–R7">
+          <Seccion id="escenarios" eyebrow="Paso 5 · Informe 3.4.1" titulo="Escenarios de estilo de vida">
             <p>
-              Para t = 1 … 52 × años, y para las M trayectorias a la vez, el motor aplica en este orden:
-            </p>
-            <DiagramaCausal />
-
-            <div className="space-y-6">
-              <div>
-                <h3 className="font-semibold text-white">a) Sorteo y balance energético</h3>
-                <Formula etiqueta="kcal/semana"><V s="neto">B</V> = 7 · <V s="cal">E</V> − <V s="act">G</V></Formula>
-              </div>
-              <div>
-                <h3 className="font-semibold text-white">b) R3 · Observables: insulina y glucosa</h3>
-                <Formula etiqueta="demanda"><V s="ins">D</V> = 6 / <V s="I">S</V></Formula>
-                <Formula etiqueta="secreción"><V s="sec">I</V> = min( <V s="ins">D</V> , (<V s="β">C</V> / 100) · 60 )</Formula>
-                <Formula etiqueta="glucosa"><V s="ayunas">G</V> = 85 + 1.5 · max(0, <V s="ins">D</V> − <V s="sec">I</V>)</Formula>
-                <Formula etiqueta="HOMA del modelo"><V s="HOMA">R</V> = 1 / <V s="I">S</V></Formula>
-                <p className="text-sm">Mientras el páncreas puede cubrir la demanda, la glucosa se mantiene en 85; cuando la secreción no alcanza, cada µU/mL que falta sube la glucosa 1.5 mg/dL.</p>
-              </div>
-              <div>
-                <h3 className="font-semibold text-white">c) R6 · Glucotoxicidad (si G &gt; 100)</h3>
-                <Formula><V s="β">T</V> ← <V s="β">T</V> · (1 + 0.00483 · (G − 100)) ; <V s="I">S</V> ← <V s="I">S</V> · (1 − 0.0000209)</Formula>
-              </div>
-              <div>
-                <h3 className="font-semibold text-white">d) R4 · Agotamiento de células β</h3>
-                <Formula etiqueta={`si S_I < θ = ${K.THETA_UMB}`}><V s="β">C</V> ← <V s="β">C</V> − 100 · <V s="β">T</V> · (1 + (α − 1) · <V s="gen">P</V>) , α = 1.4</Formula>
-                <Formula etiqueta="si no"><V s="β">C</V> ← <V s="β">C</V> − 100 · 0.00003</Formula>
-                <p className="text-sm">Con sensibilidad baja el páncreas está sobrecargado y se desgasta mucho más rápido; con antecedente familiar, un 40 % más.</p>
-              </div>
-              <div>
-                <h3 className="font-semibold text-white">e) R2 · Resistencia periférica inducida por grasa</h3>
-                <Formula><V s="I">S</V> ← <V s="I">S</V> − 0.00000368 · <V s="adip">M</V> · (1 − <V s="act">G</V> / 3500) · (1 + (α − 1) · <V s="gen">P</V>)</Formula>
-                <p className="text-sm">Más grasa → más resistencia; más actividad física → menos efecto.</p>
-              </div>
-              <div>
-                <h3 className="font-semibold text-white">f) R7 · Recuperación por intervención</h3>
-                <Formula etiqueta="solo con intervención"><V s="I">S</V> ← <V s="I">S</V> + 0.00207 · dosis · (1 − <V s="I">S</V>)</Formula>
-              </div>
-              <div>
-                <h3 className="font-semibold text-white">g) R1 · Lipogénesis</h3>
-                <Formula etiqueta="7700 kcal = 1 kg"><V s="adip">M</V> ← <V s="adip">M</V> + [ 0.30 · <V s="neto">B</V> + 186 · (<V s="adip">M</V><sub>0</sub> − <V s="adip">M</V>) ] / 7700</Formula>
-                <p className="text-sm">
-                  La grasa sube y baja con el balance real (el documento original solo acumulaba superávit, lo que engordaba a todos por igual). Solo el 30 % del
-                  balance calculado se convierte en grasa, y un término de <b className="text-white">adaptación metabólica</b> (186 kcal/semana por kg) hace que al
-                  adelgazar el cuerpo gaste menos: el peso se estabiliza en un nuevo equilibrio en vez de caer sin límite, y si se abandona el plan vuelve hacia su
-                  nivel de partida <V s="adip">M</V><sub>0</sub>.
-                </p>
-              </div>
-              <div>
-                <h3 className="font-semibold text-white">h) R5 · Punto de inflexión</h3>
-                <p className="text-sm">
-                  Se clasifica la etapa de cada trayectoria (sección 6). La primera semana en que una trayectoria entra en diabetes se registra su{" "}
-                  <b className="text-white">edad de inflexión</b> = edad + t / 52.
-                </p>
-              </div>
-            </div>
-          </Seccion>
-
-          {/* 6. Etapas */}
-          <Seccion id="etapas" eyebrow="Paso 6" titulo="Clasificación de etapas">
-            <p>
-              La semana 0 usa los criterios clínicos estándar sobre los labs reales. Desde la semana 1, el modelo clasifica con sus propias variables:
+              Un escenario cambia el sedentarismo y/o el IMC del paciente desde cierto año; el resto de la simulación es idéntico y usa los mismos
+              números aleatorios, de modo que la diferencia entre escenarios se debe solo al cambio.
             </p>
             <Tabla
-              cabecera={["Etapa", "Hoy (labs reales)", "Proyección (modelo)"]}
-              filas={(
-                [
-                  ["sano", "ninguno de los siguientes", "ninguno de los siguientes"],
-                  ["resistencia", "HOMA-IR ≥ 2.5", "1 / S_I ≥ 2.5"],
-                  ["prediabetes", "Glucosa ≥ 100 o HbA1c ≥ 5.7", "G ≥ 100"],
-                  ["diabetes", "Glucosa ≥ 126 o HbA1c ≥ 6.5", "G ≥ 126 o C_β ≤ 8.4 %"],
-                ] as [Etapa, string, string][]
-              ).map(([e, hoy, modelo]) => [
-                <span key={e} className="font-semibold" style={{ color: tinta(COLOR_ETAPA[e]) }}>{{ sano: "Sano", resistencia: "Resistencia", prediabetes: "Prediabetes", diabetes: "Diabetes tipo 2" }[e]}</span>,
-                hoy,
-                <span key="m" className="font-mono text-xs">{modelo}</span>,
-              ])}
+              cabecera={["Escenario", "Efecto"]}
+              filas={[
+                ["Sin cambios", "El paciente mantiene su estilo de vida."],
+                ["Moderada", "Un nivel menos sedentario y −3.5 % de IMC (sin bajar de 22)."],
+                ["Intensiva", "Pasa a activo y −7 % de IMC (sin bajar de 22)."],
+                ["Personalizada", "Eliges el nivel de actividad, el IMC objetivo y el año de inicio."],
+              ]}
             />
-            <p className="text-sm">Se evalúa de arriba hacia abajo: la condición más grave que se cumpla define la etapa.</p>
           </Seccion>
 
-          {/* 7. Monte Carlo */}
-          <Seccion id="monte-carlo" eyebrow="Paso 7" titulo="De trayectorias a pronóstico">
-            <p>Al terminar el bucle hay M historias distintas del mismo paciente. Se resumen así:</p>
-            <div className="grid items-center gap-6 md:grid-cols-[1fr_1fr]">
-              <ul className="space-y-3 text-sm">
-                <li>
-                  <b className="text-white">Bandas anuales.</b> Al final de cada año se ordenan los valores de las M trayectorias y se toman los percentiles 10, 50 y 90 de
-                  glucosa, insulina, HOMA-IR, reserva β, sensibilidad y grasa.
-                </li>
-                <li>
-                  <b className="text-white">Probabilidad a 5 años.</b> Proporción de trayectorias cuya edad de inflexión cae dentro de los primeros 5 años.
-                </li>
-                <li>
-                  <b className="text-white">Etapa al final del horizonte.</b> Porcentaje de trayectorias en cada etapa el último año; la más frecuente es la “etapa esperada”.
-                </li>
-                <li>
-                  <b className="text-white">Edad mediana de inflexión</b> entre las trayectorias que llegan a diabetes.
-                </li>
-              </ul>
-              <div className="rounded-xl border border-hud-borde bg-hud-panel/60 p-4">
-                <IlustracionBandas />
-              </div>
-            </div>
-            <Formula etiqueta="estimador Monte Carlo">
-              P(DMT2 ≤ 5 años) = (1 / M) · Σ<sub>m</sub> 𝟙[ edad<sub>inflexión,m</sub> ≤ edad + 5 ]
-            </Formula>
-            <p className="text-sm">
-              Con M = 500 el error estándar de esa probabilidad es como máximo √(0.25 / 500) ≈ 2.2 puntos porcentuales; con M = 100, ≈ 5 puntos. Por eso más
-              trayectorias dan bandas más estables.
+          <Seccion id="salidas" eyebrow="Paso 6 · Informe 3.4.2 y 3.4.3" titulo="Resultados y gráficas">
+            <p>El simulador muestra las mismas gráficas del informe, calculadas sobre todas las trayectorias:</p>
+            <Tabla
+              cabecera={["Gráfica", "Qué muestra"]}
+              filas={[
+                ["Perfil metabólico (4 gráficas)", "Glucemia con su quiebre, HOMA-β, pérdida de células β con las líneas de 40 % y 63 %, y caída de la sensibilidad."],
+                ["Antes del diagnóstico", "Glucemia alineada al momento del diagnóstico: plana durante años y con quiebre al final (contraste con Whitehall II)."],
+                ["Tiempo libre de diabetes", "Años hasta el diagnóstico mediano por escenario, con el horizonte máximo (contraste con el DPP)."],
+                ["Incidencia acumulada", "Porcentaje de trayectorias diagnosticadas en el tiempo."],
+                ["Dispersión del diagnóstico", "Histograma del año de diagnóstico de las trayectorias."],
+              ]}
+            />
+            <p className="text-sm text-hud-tenue">
+              En la gráfica de una trayectoria se muestra la simulación cuyo diagnóstico está más cerca de la mediana. Con “Mediana y banda”
+              se ve el percentil 10 a 90 del conjunto.
             </p>
           </Seccion>
 
-          {/* 8. Parámetros */}
           <Seccion id="parametros" eyebrow="Referencia" titulo="Parámetros del modelo">
             <Tabla
-              cabecera={["Símbolo", "Valor", "Significado", "Origen"]}
+              cabecera={["Parámetro", "Valor", "Significado"]}
               filas={[
-                ["G_basal", "85 mg/dL", "Glucemia basal normal", "Documento"],
-                ["I_sec,max", "60 µU/mL", "Secreción máxima posible", "Documento"],
-                ["G_act,max", "3500 kcal/sem", "Techo de actividad física", "Documento"],
-                ["K_cal", "7700 kcal/kg", "Energía por kg de tejido adiposo", "Documento"],
-                ["α_gen", "1.4", "Penalización genética (rango 1.2–1.6)", "Documento (punto medio)"],
-                ["θ_umb", "0.5", "Umbral de sobrecarga pancreática (rango 0.4–0.6)", "Documento (punto medio)"],
-                ["D_ins,basal", "6.0", "Demanda de insulina con sensibilidad normal", "Calibración"],
-                ["k2", "0.00000368", "Resistencia inducida por grasa", "Calibración"],
-                ["k5", "1.5", "mg/dL de glucosa por µU/mL de déficit", "Calibración"],
-                ["k6 · k6b", "0.00483 · 0.0000209", "Glucotoxicidad sobre T_β y S_I", "Calibración"],
-                ["k7", "0.00207", "Recuperación semanal por intervención (× dosis)", "Calibración"],
-                ["MET", "3.5 · 6 · 8.5", "Caminar · bicicleta/trote · correr", "Compendium of Physical Activities"],
-                ["T_β,basal", "0.00003", "Desgaste β sin sobrecarga", "Calibración"],
-                ["T_β", "Gamma(2; 0.00011)", "Tasa de agotamiento β, una vez por trayectoria", "Calibración"],
-                ["Eficiencia del balance", "0.30", "Fracción del balance energético que se vuelve grasa", "Calibración"],
-                ["Adaptación metabólica", "186 kcal/sem·kg", "Cierra el déficit al adelgazar; recupera al abandonar", "Calibración"],
-                ["Deriva sin cambios", "27.6 kcal/sem", "Superávit medio del escenario «sin cambios»", "Calibración"],
-                ["C_β diabetes", "8.4 %", "Reserva β bajo la cual el modelo declara diabetes", "Calibración"],
-                ["Pisos de C_β", "60 · 18.4 · 11 %", "Reserva mínima inicial: sano · resistencia · prediabetes", "Calibración"],
-                ["Margen de reserva", "6.4 puntos", "Mínimo sobre el umbral de diabetes al arrancar sin ser diabético", "Calibración"],
+                [<V key="eg" s="G0">E</V>, K.E_G0, "Consumo de glucosa independiente de insulina"],
+                [<span key="sm">σ<sub>max</sub></span>, K.SIGMA_MAX, "Secreción máxima de insulina"],
+                ["α", K.ALPHA, "Glucosa de media saturación de la secreción"],
+                [<V key="vi" s="I">V</V>, K.V_I, "Volumen de distribución de la insulina"],
+                [<V key="d0" s="0">d</V>, K.D_0, "Mortalidad basal de células β"],
+                [<V key="r1" s="1">r</V>, K.R_1, "Proliferación de células β"],
+                [<V key="b0" s="0">β</V>, K.BETA_0, "Masa beta inicial"],
+                [<V key="kv" s="VAT base">k</V>, K.K_VAT_BASE, "Desgaste adiposo base"],
+                [<V key="yd" s="DMT2">Y</V>, K.Y_DMT2, "Umbral diagnóstico (mg/dL)"],
               ]}
             />
-            <p className="text-sm">
-              Las constantes marcadas como «Calibración» se ajustaron con una búsqueda automática para que 7 pacientes tipo reproduzcan incidencias de diabetes a
-              5 años del orden de las publicadas (por ejemplo, el <i>Diabetes Prevention Program</i>: ≈ 11 casos por 100 personas-año con placebo y ≈ −58 % con
-              estilo de vida intensivo) y un comportamiento del peso creíble. Es un ajuste a rangos de la literatura, no una validación con datos locales.
-            </p>
           </Seccion>
 
-          {/* 9. Limitaciones */}
+          <Seccion id="codigo" eyebrow="Para revisar" titulo="Dónde está cada parte del informe en el código">
+            <p>El motor está en <code className="font-mono text-hud-acento">backend/app/motor/</code>, con un archivo por sección del informe.</p>
+            <Tabla
+              cabecera={["Informe", "Archivo", "Contenido"]}
+              filas={[
+                ["3.2.1 Constantes", "parametros.py", "Constantes de Topp, perfiles de sedentarismo y límites"],
+                ["3.2.1 Variables aleatorias", "variables_aleatorias.py", "Weibull, Normal, Gamma, Bernoulli y Uniforme"],
+                ["3.2.2 Ecuaciones 1 a 5", "ecuaciones.py", "Una función por ecuación y el balance homeostático"],
+                ["3.3.1 PacienteVirtual", "paciente.py", "S_I0, k_VAT, riesgo_vida y a_gen"],
+                ["3.3.1 SimuladorClinico y Ec. 6", "simulador.py", "Bucle de Euler y condición de parada"],
+                ["3.4.1 Escenarios", "escenarios.py", "Cambios de estilo de vida"],
+                ["3.4.2 Índices clínicos", "indices_clinicos.py", "HOMA-IR, HOMA-β, déficit beta y etapa"],
+                ["3.4.2 y 3.4.3 Gráficos", "resultados.py", "Bandas, trayectoria individual y pre-diagnóstico"],
+              ]}
+            />
+          </Seccion>
+
           <Seccion id="limitaciones" eyebrow="Importante" titulo="Alcances y límites">
             <div className="flex gap-3 rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-amber-100">
               <TriangleAlert size={20} className="mt-0.5 flex-shrink-0 text-amber-300" />
               <div className="space-y-2 text-sm">
                 <p><b className="text-amber-200">Es un pronóstico con incertidumbre, no un diagnóstico.</b> Sirve para conversar con el paciente sobre escenarios, no para decidir un tratamiento.</p>
-                <p>Las constantes se ajustaron a rangos publicados en la literatura; todavía no se validaron con datos locales de SNIS-VE, SEDES La Paz o la IDF, así que los números son orientativos.</p>
-                <p>La actividad y la ingesta de referencia se derivan del IMC porque el registro todavía no recoge esos datos directamente.</p>
-                <p>El modelo supone que el plan se cumple mientras dura: no incluye adherencia parcial ni abandono gradual. Con intervención, la glucosa mediana de quienes no progresan vuelve a valores normales, lo que puede ser optimista.</p>
-                <p>La hipertensión, el tabaquismo y el sexo se registran pero todavía no intervienen en el cálculo.</p>
+                <p>El modelo usa las constantes teóricas de Topp et al.; todavía no se calibró ni validó con datos locales. Al diagnóstico el déficit de células β es de unos 33 %, menor que el 50–60 % que reporta el UKPDS.</p>
+                <p>Todo paciente parte de glucosa 90 mg/dL e insulina 10 µU/mL: no se usan laboratorios propios del paciente.</p>
+                <p>Los escenarios suponen que el cambio de estilo de vida se cumple por completo desde su inicio.</p>
               </div>
             </div>
           </Seccion>

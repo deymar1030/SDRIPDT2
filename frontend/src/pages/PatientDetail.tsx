@@ -2,8 +2,9 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronRight, FlaskConical, History } from "lucide-react";
 import { Shell } from "../components/Shell";
-import { StageBadge } from "../components/StageBadge";
+import { SedentarismoBadge } from "../components/SedentarismoBadge";
 import { PanelAnatomico, estadoDesdePaciente } from "../components/PanelAnatomico";
+import { textoAntecedente } from "../lib/perfil";
 import { Aviso, Avatar, BotonEnlace, Cargando, Panel } from "../components/ui";
 import { api } from "../api/client";
 import type { Paciente, SimulationRunSummary } from "../types";
@@ -39,9 +40,6 @@ export default function PatientDetail() {
   if (error) return <Shell titulo="Ficha de paciente"><Aviso tipo="error">{error}</Aviso></Shell>;
   if (!paciente) return <Shell titulo="Ficha de paciente"><Cargando /></Shell>;
 
-  const antecedente =
-    paciente.antecedente_familiar == null ? "Antecedente familiar: sin dato" : paciente.antecedente_familiar ? "Antecedente familiar de DMT2" : "Sin antecedente familiar";
-
   return (
     <Shell titulo="Ficha de paciente">
       <div className="space-y-5">
@@ -55,25 +53,20 @@ export default function PatientDetail() {
                 <h2 className="text-xl font-bold text-white">{paciente.nombre}</h2>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   <Chip>{paciente.edad} años</Chip>
-                  {paciente.sexo && <Chip>{paciente.sexo}</Chip>}
                   <Chip>IMC {paciente.imc}</Chip>
-                  <Chip alerta={paciente.antecedente_familiar === true}>{antecedente}</Chip>
-                  {paciente.hipertension && <Chip alerta>Hipertensión</Chip>}
-                  {paciente.tabaquismo && <Chip alerta>Tabaquismo</Chip>}
+                  <SedentarismoBadge nivel={paciente.sedentarismo} />
+                  <Chip alerta={paciente.antecedente_familiar === true}>{textoAntecedente(paciente.antecedente_familiar)}</Chip>
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <StageBadge etapa={paciente.etapaActual} className="px-3 py-1 text-sm" />
-              <BotonEnlace to={`/simulador?id=${paciente.id}`} icono={<FlaskConical size={16} />}>Simular pronóstico</BotonEnlace>
-            </div>
+            <BotonEnlace to={`/simulador?id=${paciente.id}`} icono={<FlaskConical size={16} />}>Simular pronóstico</BotonEnlace>
           </div>
         </Panel>
 
-        <PanelAnatomico estado={estadoDesdePaciente(paciente)} momento="Hoy">
+        <PanelAnatomico estado={estadoDesdePaciente(paciente)} momento="Estado inicial del modelo">
           <p className="text-xs text-sky-200/60">
-            Laboratorio medido hoy. Reserva β, sensibilidad y grasa acumulada son estimaciones del modelo a partir de esos
-            valores (HOMA-IR = glucosa × insulina ÷ 405).
+            Todo paciente parte de la homeostasis ideal del modelo (glucosa 90 mg/dL, insulina 10 µU/mL, masa beta 100 %). Su
+            sensibilidad inicial S_I0 y su tasa de desgaste adiposo k_VAT salen del IMC y el sedentarismo.
           </p>
         </PanelAnatomico>
 

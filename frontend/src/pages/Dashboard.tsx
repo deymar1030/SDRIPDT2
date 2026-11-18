@@ -3,14 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { Users, AlertTriangle, FlaskConical, Clock, UserPlus, ChevronRight } from "lucide-react";
 import { Shell } from "../components/Shell";
 import { StatTile } from "../components/StatTile";
-import { StageBadge, COLOR_ETAPA } from "../components/StageBadge";
+import { SedentarismoBadge } from "../components/SedentarismoBadge";
 import { Aviso, Avatar, BotonEnlace, Cargando, Panel, Vacio, claseTabla, tinta } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../api/client";
-import type { Etapa, PacienteRiesgo } from "../types";
-
-const ETAPAS: Etapa[] = ["sano", "resistencia", "prediabetes", "diabetes"];
-const NOMBRE_ETAPA: Record<Etapa, string> = { sano: "Sano", resistencia: "Resistencia", prediabetes: "Prediabetes", diabetes: "Diabetes" };
+import { COLOR_SEDENTARISMO, NOMBRE_SEDENTARISMO, SEDENTARISMO } from "../lib/perfil";
+import type { PacienteRiesgo, Sedentarismo } from "../types";
 
 function formatearFecha(iso: string) {
   return new Date(iso).toLocaleDateString("es-BO", { day: "2-digit", month: "short", year: "numeric" });
@@ -35,12 +33,12 @@ export default function Dashboard() {
 
   const resumen = useMemo(() => {
     const lista = riesgo ?? [];
-    const porEtapa = Object.fromEntries(ETAPAS.map((e) => [e, lista.filter((p) => p.etapaActual === e).length])) as Record<Etapa, number>;
+    const porNivel = Object.fromEntries(SEDENTARISMO.map((n) => [n, lista.filter((p) => p.sedentarismo === n).length])) as Record<Sedentarismo, number>;
     return {
       total: lista.length,
-      enRiesgo: porEtapa.prediabetes + porEtapa.diabetes,
+      enRiesgo: lista.filter((p) => (p.ultimaSimulacion?.prob5 ?? 0) >= 50).length,
       simulados: lista.filter((p) => p.ultimaSimulacion).length,
-      porEtapa,
+      porNivel,
     };
   }, [riesgo]);
 
@@ -72,7 +70,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatTile etiqueta="Pacientes" valor={riesgo ? resumen.total : "—"} icono={<Users size={16} />} />
-        <StatTile etiqueta="En riesgo" valor={riesgo ? resumen.enRiesgo : "—"} nota="Prediabetes o diabetes" icono={<AlertTriangle size={16} />} color="#f43f5e" />
+        <StatTile etiqueta="En riesgo" valor={riesgo ? resumen.enRiesgo : "—"} nota="Prob. a 5 años de 50 % o más" icono={<AlertTriangle size={16} />} color="#f43f5e" />
         <StatTile etiqueta="Simulados" valor={riesgo ? resumen.simulados : "—"} nota="Con al menos un pronóstico" icono={<FlaskConical size={16} />} color="#a78bfa" />
         <StatTile etiqueta="Sin simular" valor={riesgo ? resumen.total - resumen.simulados : "—"} nota="Pendientes de pronóstico" icono={<Clock size={16} />} color="#facc15" />
       </div>
@@ -98,7 +96,7 @@ export default function Dashboard() {
                 <thead>
                   <tr className={claseTabla.encabezado}>
                     <th className={claseTabla.celdaEncabezado}>Paciente</th>
-                    <th className={claseTabla.celdaEncabezado}>Etapa actual</th>
+                    <th className={claseTabla.celdaEncabezado}>Sedentarismo</th>
                     <th className={`${claseTabla.celdaEncabezado} w-44`}>Prob. diabetes 5 años</th>
                     <th className={claseTabla.celdaEncabezado}>Última simulación</th>
                     <th className={claseTabla.celdaEncabezado} />
@@ -122,7 +120,7 @@ export default function Dashboard() {
                             </div>
                           </div>
                         </td>
-                        <td className={claseTabla.celda}><StageBadge etapa={p.etapaActual} /></td>
+                        <td className={claseTabla.celda}><SedentarismoBadge nivel={p.sedentarismo} /></td>
                         <td className={claseTabla.celda}>
                           {sim ? (
                             <div className="flex items-center gap-2">
@@ -150,25 +148,25 @@ export default function Dashboard() {
           )}
         </Panel>
 
-        <Panel titulo="Distribución por etapa" descripcion="Etapa clínica actual según los laboratorios de hoy.">
+        <Panel titulo="Distribución por sedentarismo" descripcion="Nivel de actividad física registrado de tus pacientes.">
           {!riesgo ? (
             <Cargando />
           ) : (
             <div className="space-y-4">
-              {ETAPAS.map((e) => {
-                const n = resumen.porEtapa[e];
+              {SEDENTARISMO.map((nivel) => {
+                const n = resumen.porNivel[nivel];
                 const pct = resumen.total ? (n / resumen.total) * 100 : 0;
                 return (
-                  <div key={e}>
+                  <div key={nivel}>
                     <div className="mb-1.5 flex items-baseline justify-between text-sm">
                       <span className="flex items-center gap-2 text-hud-texto">
-                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: COLOR_ETAPA[e], boxShadow: `0 0 6px ${COLOR_ETAPA[e]}` }} />
-                        {NOMBRE_ETAPA[e]}
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: COLOR_SEDENTARISMO[nivel], boxShadow: `0 0 6px ${COLOR_SEDENTARISMO[nivel]}` }} />
+                        {NOMBRE_SEDENTARISMO[nivel]}
                       </span>
                       <span className="font-mono text-white">{n}</span>
                     </div>
                     <div className="h-1.5 rounded-full bg-white/10">
-                      <div className="h-1.5 rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: COLOR_ETAPA[e] }} />
+                      <div className="h-1.5 rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: COLOR_SEDENTARISMO[nivel] }} />
                     </div>
                   </div>
                 );

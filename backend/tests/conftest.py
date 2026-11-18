@@ -20,9 +20,8 @@ from fastapi.testclient import TestClient  # noqa: E402
 BACKEND = pathlib.Path(__file__).resolve().parent.parent
 
 PACIENTE_BASE = {
-    "nombre": "Paciente de Prueba", "edad": 50, "sexo": "Femenino", "imc": 30.9, "peso": 79, "talla": 160,
-    "glucosa": 108, "insulina": 15, "hba1c": 5.9, "antecedente_familiar": True,
-    "hipertension": False, "tabaquismo": False, "notas": "Sedentaria.",
+    "nombre": "Paciente de Prueba", "edad": 50, "imc": 30.9, "sedentarismo": "moderado",
+    "antecedente_familiar": True, "notas": "Sedentaria.",
 }
 
 

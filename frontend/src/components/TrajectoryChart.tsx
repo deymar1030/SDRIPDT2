@@ -17,7 +17,7 @@ export const PALETA_ESCENARIOS = ["#22d3ee", "#a78bfa", "#f472b6", "#34d399"];
 
 interface Props {
   resultados: ResultadoEscenario[];
-  marcador: "glucosa" | "insulina" | "homaIR" | "reserva";
+  marcador: "glucosa" | "insulina" | "homaIR" | "homaBeta" | "deficitBeta" | "sensibilidad";
   unidad: string;
 }
 
@@ -33,7 +33,7 @@ function TooltipPersonalizado({ active, payload, label }: { active?: boolean; pa
   const medianas = payload.filter((p) => p.dataKey.startsWith("mediana_"));
   return (
     <div className="rounded-lg border border-hud-borde-fuerte bg-hud-fondo/95 p-3 text-xs shadow-lg">
-      <p className="mb-1 font-semibold text-white">Año {label}</p>
+      <p className="mb-1 font-semibold text-white">Año {typeof label === "number" ? Number(label.toFixed(2)) : label}</p>
       {medianas.map((p) => (
         <p key={p.dataKey} style={{ color: tinta(p.color) }} className="font-medium">
           {p.name}: {typeof p.value === "number" ? p.value.toFixed(1) : p.value}
@@ -44,11 +44,11 @@ function TooltipPersonalizado({ active, payload, label }: { active?: boolean; pa
 }
 
 export function TrajectoryChart({ resultados, marcador, unidad }: Props) {
-  const anios = resultados[0]?.resumenAnual.map((p) => p.anio) ?? [];
+  const anios = resultados[0]?.serie.map((p) => p.anio) ?? [];
   const data = anios.map((anio) => {
     const fila: Record<string, number | number[]> = { anio };
     resultados.forEach((r) => {
-      const punto = r.resumenAnual.find((p) => p.anio === anio);
+      const punto = r.serie.find((p) => p.anio === anio);
       if (!punto) return;
       const banda = punto[marcador];
       fila[`rango_${r.escenarioId}`] = [banda.p10, banda.p90];
@@ -66,7 +66,7 @@ export function TrajectoryChart({ resultados, marcador, unidad }: Props) {
     <ResponsiveContainer width="100%" height={320}>
       <ComposedChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke={ejes.rejilla} vertical={false} />
-        <XAxis dataKey="anio" stroke={ejes.linea} tick={{ fontSize: 12, fill: ejes.texto }} label={{ value: "Año", position: "insideBottom", offset: -3, fontSize: 12, fill: ejes.texto }} />
+        <XAxis dataKey="anio" type="number" domain={["dataMin", "dataMax"]} stroke={ejes.linea} tick={{ fontSize: 12, fill: ejes.texto }} label={{ value: "Año", position: "insideBottom", offset: -3, fontSize: 12, fill: ejes.texto }} />
         <YAxis stroke={ejes.linea} tick={{ fontSize: 12, fill: ejes.texto }} label={{ value: unidad, angle: -90, position: "insideLeft", fontSize: 12, fill: ejes.texto }} />
         <Tooltip content={<TooltipPersonalizado />} cursor={{ stroke: ejes.cursor }} />
         <Legend wrapperStyle={{ fontSize: 12, color: ejes.texto }} />

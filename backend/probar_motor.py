@@ -1,20 +1,15 @@
-"""Script de prueba rápida del motor, fuera del servidor HTTP (para iterar
-calibración sin depender del reload de uvicorn)."""
-from app.engine import simular_paciente
+"""Corre fuera del servidor las cuatro personas de prueba del informe (3.4.1) y compara con sus resultados."""
+from app.motor import simular_paciente
 
-PACIENTES = [
-    dict(nombre="Rosa", edad=52, imc=31, glucosa=108, insulina=15, hba1c=5.9, antecedente_familiar=True),
-    dict(nombre="Hugo", edad=46, imc=27, glucosa=93, insulina=9, hba1c=5.4, antecedente_familiar=False),
-    dict(nombre="Elena", edad=60, imc=34, glucosa=131, insulina=19, hba1c=6.6, antecedente_familiar=None),
-    dict(nombre="Patricio", edad=38, imc=24, glucosa=85, insulina=6, hba1c=5.1, antecedente_familiar=False),
+PERSONAS = [
+    ("Persona 1 · Control", dict(edad=20, imc=19.0, sedentarismo="moderado", antecedente_familiar=True), 30, "18.5 años"),
+    ("Persona 2 · Agudo", dict(edad=40, imc=33.5, sedentarismo="severo", antecedente_familiar=True), 10, "1.5 años"),
+    ("Persona 3 · Riesgo por inactividad", dict(edad=20, imc=25.0, sedentarismo="severo", antecedente_familiar=False), 10, "5.0 años"),
+    ("Persona 4 · Preventivo", dict(edad=65, imc=22.0, sedentarismo="activo", antecedente_familiar=False), 30, "sin diabetes"),
 ]
 
-for p in PACIENTES:
-    for nivel in ("nula", "moderada", "intensiva"):
-        r = simular_paciente(
-            edad=p["edad"], imc=p["imc"], glucosa=p["glucosa"], insulina=p["insulina"],
-            hba1c=p["hba1c"], antecedente_familiar=p["antecedente_familiar"],
-            nivel_intervencion=nivel, horizonte_anios=15, trayectorias=300, semilla=42,
-        )
-        print(f"{p['nombre']:10s} [{nivel:10s}] prob5={r['prob5']:5.1f}  probH={r['probHorizonte']:5.1f}  etapaFinal={r['etapaMediana']:12s} edadInflex={r['edadMedianaInflexion']}")
-    print()
+for nombre, perfil, horizonte, esperado in PERSONAS:
+    r = simular_paciente(**perfil, horizonte_anios=horizonte, trayectorias=200, semilla=42)
+    mediano = r["tiempoMedianoDiagnostico"]
+    obtenido = "sin diabetes" if mediano is None else f"{mediano:.1f} años"
+    print(f"{nombre:36s} informe: {esperado:13s} simulador: {obtenido:13s} P(≤5 años) = {r['prob5']:5.1f} %")

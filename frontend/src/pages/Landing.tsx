@@ -39,12 +39,12 @@ function TituloSeccion({ eyebrow, titulo, texto }: { eyebrow: string; titulo: st
 const ETAPAS = [
   { etapa: "sano" as const, nombre: "Sano", criterio: "HOMA-IR < 2.5 y glucosa < 100 mg/dL", texto: "Las células responden bien a la insulina." },
   { etapa: "resistencia" as const, nombre: "Resistencia a la insulina", criterio: "HOMA-IR ≥ 2.5", texto: "El páncreas compensa secretando más insulina." },
-  { etapa: "prediabetes" as const, nombre: "Prediabetes", criterio: "Glucosa 100–125 mg/dL o HbA1c 5.7–6.4 %", texto: "La compensación empieza a no alcanzar." },
-  { etapa: "diabetes" as const, nombre: "Diabetes tipo 2", criterio: "Glucosa ≥ 126 mg/dL o HbA1c ≥ 6.5 %", texto: "La reserva de células β se agota." },
+  { etapa: "prediabetes" as const, nombre: "Prediabetes", criterio: "Glucosa 100–125 mg/dL", texto: "La compensación empieza a no alcanzar." },
+  { etapa: "diabetes" as const, nombre: "Diabetes tipo 2", criterio: "Glucosa ≥ 126 mg/dL", texto: "La reserva de células β se agota." },
 ];
 
 const CARACTERISTICAS = [
-  { icono: UserRound, titulo: "Ficha metabólica del paciente", texto: "Registra glucosa, insulina, HbA1c, IMC y antecedentes; el sistema calcula el HOMA-IR y la etapa clínica de hoy." },
+  { icono: UserRound, titulo: "Ficha del paciente", texto: "Registra edad, IMC, nivel de sedentarismo y antecedentes familiares: las cinco entradas del modelo." },
   { icono: ScanHeart, titulo: "Panel anatómico", texto: "Páncreas, hígado, tejido adiposo y sangre cambian de color año a año mientras se reproduce la simulación." },
   { icono: GitCompareArrows, titulo: "Escenarios comparables", texto: "Hasta 4 escenarios por corrida: sin cambios, intervención moderada o intensiva, lado a lado." },
   { icono: Dices, titulo: "Monte Carlo con incertidumbre", texto: "Cientos de trayectorias posibles por escenario; se muestra la mediana y la banda donde cae el 80 %." },
@@ -57,15 +57,15 @@ const PASOS = [
     n: 1,
     imagen: "/images/landing/glucometro.jpg",
     alt: "Persona midiendo su glucosa con un glucómetro",
-    titulo: "Registra los laboratorios de hoy",
-    texto: "Glucosa e insulina en ayunas, HbA1c, peso y talla. Con eso el modelo estima el estado metabólico oculto del paciente: sensibilidad a la insulina, reserva pancreática y grasa acumulada.",
+    titulo: "Registra los datos del paciente",
+    texto: "Edad, IMC, sedentarismo y antecedentes familiares. Con eso el modelo calcula la sensibilidad inicial a la insulina y la velocidad con que se desgasta.",
   },
   {
     n: 2,
     imagen: "/images/landing/alimentacion.jpg",
     alt: "Preparación de una ensalada con verduras frescas",
     titulo: "Plantea escenarios de intervención",
-    texto: "Arma cada “¿y si…?” en un panel: cuántas calorías quitar al día, qué ejercicio, cuántos días y minutos, y desde cuándo. El simulador traduce esos hábitos a kcal y los compara con “seguir igual”.",
+    texto: "Arma cada “¿y si…?” en un panel: qué nivel de actividad tendría, qué IMC alcanzaría y desde cuándo. El simulador lo compara con “seguir igual”.",
   },
   {
     n: 3,
@@ -97,7 +97,7 @@ export default function Landing() {
               Mira hoy el futuro metabólico de tu paciente
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-relaxed text-hud-suave">
-              A partir de sus laboratorios actuales, el simulador proyecta semana a semana cómo podría progresar su
+              A partir de su perfil, el simulador proyecta día a día cómo podría progresar su
               resistencia a la insulina hacia la diabetes tipo 2 — y cuánto cambia ese futuro con una intervención.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
@@ -110,7 +110,7 @@ export default function Landing() {
             </div>
             <dl className="mt-10 grid max-w-lg grid-cols-3 gap-4 border-t border-hud-borde pt-6">
               {[
-                ["1 semana", "paso de tiempo"],
+                ["1/5 de día", "paso de integración"],
                 ["hasta 20", "años de horizonte"],
                 ["500", "trayectorias por escenario"],
               ].map(([valor, etiqueta]) => (
@@ -227,7 +227,7 @@ export default function Landing() {
       {/* ---------- Flujo de trabajo ---------- */}
       <section id="flujo" className="scroll-mt-20 border-y border-hud-borde bg-hud-panel/40">
         <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
-          <TituloSeccion eyebrow="Flujo de trabajo" titulo="De los laboratorios a una conversación con el paciente" />
+          <TituloSeccion eyebrow="Flujo de trabajo" titulo="Del perfil del paciente a una conversación sobre su futuro" />
           <div className="mt-12 space-y-14 lg:space-y-20">
             {PASOS.map((p, i) => (
               <div key={p.n} className={`grid items-center gap-8 lg:grid-cols-2 lg:gap-14 ${i % 2 === 1 ? "lg:[&>*:first-child]:order-2" : ""}`}>
@@ -268,18 +268,18 @@ export default function Landing() {
             <div>
               <Eyebrow>Detrás de cada pronóstico</Eyebrow>
               <h2 className="mt-2 text-2xl font-bold leading-tight text-white sm:text-3xl">
-                52 pasos por año, cientos de futuros posibles
+                Ecuaciones diferenciales, cientos de futuros posibles
               </h2>
               <p className="mt-3 text-hud-suave">
-                Cada semana el modelo sortea cuánto come y cuánto se mueve el paciente, actualiza su grasa corporal, su
-                sensibilidad a la insulina y su reserva pancreática con siete reglas (R1–R7), y recalcula la glucosa.
+                Cada paso el modelo sortea el envejecimiento, la fluctuación metabólica y la muerte de células β, y actualiza la
+                sensibilidad a la insulina, la masa beta, la insulina y la glucosa con las ecuaciones de Topp.
                 Repetido cientos de veces, eso da una probabilidad, no una sola respuesta.
               </p>
               <div className="mt-6 grid gap-2 font-mono text-sm sm:grid-cols-2">
                 {[
-                  "S_I(0) = 6 / D_ins(0)",
-                  "I_sec = min(D_ins, C_β·0.6)",
-                  "G = 85 + 1.5·max(0, D_ins − I_sec)",
+                  "dS_I = −k_VAT · E_cal · S_I · X_t",
+                  "dβ = β · (d₀ + r₁·G − r₂·mult·G²)",
+                  "dG = R₀ − E_G0·G − S_I·I·G",
                   "P(DMT2 ≤ 5 años) = n / M",
                 ].map((f) => (
                   <code key={f} className="rounded-lg border border-hud-borde bg-hud-fondo/60 px-3 py-2 text-cyan-200">{f}</code>
@@ -301,7 +301,7 @@ export default function Landing() {
         <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-6 px-4 py-14 sm:px-6 md:flex-row md:items-center">
           <div>
             <h2 className="text-2xl font-bold text-white">¿Listo para simular tu primer pronóstico?</h2>
-            <p className="mt-1 text-hud-suave">Registra a tu paciente con sus laboratorios de hoy y compara sus escenarios en minutos. Las cuentas las crea el administrador.</p>
+            <p className="mt-1 text-hud-suave">Registra a tu paciente y compara sus escenarios en minutos. Las cuentas las crea el administrador.</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <BotonEnlace to={destinoPrincipal} icono={<FlaskConical size={16} />}>

@@ -1,40 +1,33 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, Save } from "lucide-react";
+import { Save } from "lucide-react";
 import { Shell } from "../components/Shell";
-import { AreaTexto, Aviso, Boton, BotonEnlace, Campo, Entrada, Panel, Selector, Unidad, tinta } from "../components/ui";
+import { AreaTexto, Aviso, Boton, BotonEnlace, Campo, Entrada, Panel, tinta } from "../components/ui";
 import { api } from "../api/client";
+import { COLOR_SEDENTARISMO, DETALLE_SEDENTARISMO, NOMBRE_SEDENTARISMO, SEDENTARISMO } from "../lib/perfil";
+import type { Sedentarismo } from "../types";
 
-function nivelColor(valor: number, cortes: [number, number, number]) {
-  if (valor < cortes[0]) return "#22d3ee";
-  if (valor < cortes[1]) return "#facc15";
-  if (valor < cortes[2]) return "#fb923c";
+function colorImc(imc: number) {
+  if (imc < 25) return "#22d3ee";
+  if (imc < 30) return "#facc15";
+  if (imc < 35) return "#fb923c";
   return "#f43f5e";
 }
 
-function Calculado({ etiqueta, valor, color }: { etiqueta: string; valor: string | null; color?: string }) {
-  return (
-    <div className="flex items-center justify-between rounded-lg border border-hud-borde bg-hud-fondo/50 px-3 py-2">
-      <span className="text-xs uppercase tracking-wider text-hud-suave">{etiqueta}</span>
-      <span className="font-mono text-base font-bold" style={{ color: valor && color ? tinta(color) : "var(--color-hud-tenue)" }}>{valor ?? "—"}</span>
-    </div>
-  );
-}
-
-function Interruptor({ activo, onCambio, children }: { activo: boolean; onCambio: (v: boolean) => void; children: ReactNode }) {
+function Opcion({ activa, color, titulo, detalle, onClick }: { activa: boolean; color: string; titulo: string; detalle: string; onClick: () => void }) {
   return (
     <button
       type="button"
-      onClick={() => onCambio(!activo)}
-      aria-pressed={activo}
-      className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
-        activo ? "border-hud-acento bg-hud-acento/15 text-white" : "border-hud-borde text-hud-suave hover:text-white"
-      }`}
+      onClick={onClick}
+      aria-pressed={activa}
+      className={`rounded-xl border px-4 py-3 text-left transition-colors ${activa ? "bg-white/5 text-white" : "border-hud-borde text-hud-suave hover:text-white"}`}
+      style={activa ? { borderColor: color, boxShadow: `0 0 14px ${color}33` } : undefined}
     >
-      <span className={`flex h-4 w-4 items-center justify-center rounded border ${activo ? "border-hud-acento bg-hud-acento text-slate-950" : "border-hud-tenue"}`}>
-        {activo && <Check size={12} strokeWidth={3} />}
+      <span className="flex items-center gap-2 text-sm font-semibold">
+        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}` }} />
+        {titulo}
       </span>
-      {children}
+      <span className="mt-1 block text-xs text-hud-tenue">{detalle}</span>
     </button>
   );
 }
@@ -43,53 +36,26 @@ export default function PatientNew() {
   const navigate = useNavigate();
   const [nombre, setNombre] = useState("");
   const [edad, setEdad] = useState("");
-  const [sexo, setSexo] = useState("Femenino");
-  const [peso, setPeso] = useState("");
-  const [talla, setTalla] = useState("");
-  const [glucosa, setGlucosa] = useState("");
-  const [insulina, setInsulina] = useState("");
-  const [hba1c, setHba1c] = useState("");
-  const [antecedente, setAntecedente] = useState<"desconocido" | "si" | "no">("desconocido");
-  const [hipertension, setHipertension] = useState(false);
-  const [tabaquismo, setTabaquismo] = useState(false);
+  const [imc, setImc] = useState("");
+  const [sedentarismo, setSedentarismo] = useState<Sedentarismo>("moderado");
+  const [antecedente, setAntecedente] = useState<boolean>(false);
   const [notas, setNotas] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
 
-  const imc = useMemo(() => {
-    const p = parseFloat(peso), t = parseFloat(talla);
-    if (!p || !t) return null;
-    return p / Math.pow(t / 100, 2);
-  }, [peso, talla]);
-
-  const homaIR = useMemo(() => {
-    const g = parseFloat(glucosa), i = parseFloat(insulina);
-    if (!g || !i) return null;
-    return (g * i) / 405;
-  }, [glucosa, insulina]);
+  const imcNumero = parseFloat(imc);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!imc) {
-      setError("Completa peso y talla para calcular el IMC.");
-      return;
-    }
     setCargando(true);
     try {
       const paciente = await api.crearPaciente({
         nombre,
         edad: Number(edad),
-        sexo,
-        imc: Number(imc.toFixed(1)),
-        peso: Number(peso),
-        talla: Number(talla),
-        glucosa: Number(glucosa),
-        insulina: Number(insulina),
-        hba1c: hba1c ? Number(hba1c) : undefined,
-        antecedente_familiar: antecedente === "desconocido" ? null : antecedente === "si",
-        hipertension,
-        tabaquismo,
+        imc: imcNumero,
+        sedentarismo,
+        antecedente_familiar: antecedente,
         notas: notas || undefined,
       });
       navigate(`/pacientes/${paciente.id}`);
@@ -101,74 +67,53 @@ export default function PatientNew() {
   }
 
   return (
-    <Shell titulo="Registrar paciente" subtitulo="Los campos con laboratorio alimentan directamente el simulador">
+    <Shell titulo="Registrar paciente" subtitulo="Estas son las cinco entradas del modelo del informe">
       <form onSubmit={onSubmit} className="mx-auto max-w-3xl space-y-5 pb-24">
-        <Panel titulo="Datos personales">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Campo etiqueta="Nombre completo" htmlFor="nombre" className="sm:col-span-2">
+        <Panel titulo="Datos del paciente">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Campo etiqueta="Nombre" htmlFor="nombre" className="sm:col-span-3">
               <Entrada id="nombre" required value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Ana Villarroel" />
             </Campo>
-            <Campo etiqueta="Edad (años)" htmlFor="edad">
-              <Entrada id="edad" required type="number" min={1} max={110} value={edad} onChange={(e) => setEdad(e.target.value)} />
+            <Campo etiqueta="Edad (años)" htmlFor="edad" ayuda="Persona adulta: 18 a 100">
+              <Entrada id="edad" required type="number" min={18} max={100} value={edad} onChange={(e) => setEdad(e.target.value)} />
             </Campo>
-            <Campo etiqueta="Sexo" htmlFor="sexo">
-              <Selector id="sexo" value={sexo} onChange={(e) => setSexo(e.target.value)}>
-                <option>Femenino</option>
-                <option>Masculino</option>
-                <option>Otro / prefiere no decir</option>
-              </Selector>
-            </Campo>
-          </div>
-        </Panel>
-
-        <Panel titulo="Antropometría">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Campo etiqueta="Peso (kg)" htmlFor="peso" ayuda="20 a 300 kg">
-              <Entrada id="peso" required type="number" step="0.1" min={20} max={300} value={peso} onChange={(e) => setPeso(e.target.value)} />
-            </Campo>
-            <Campo etiqueta="Talla (cm)" htmlFor="talla" ayuda="100 a 230 cm">
-              <Entrada id="talla" required type="number" step="0.1" min={100} max={230} value={talla} onChange={(e) => setTalla(e.target.value)} />
+            <Campo etiqueta="IMC" htmlFor="imc" ayuda="Entre 12 y 70 kg/m²">
+              <Entrada id="imc" required type="number" step="0.1" min={12} max={70} value={imc} onChange={(e) => setImc(e.target.value)} />
             </Campo>
             <div className="flex items-end">
-              <div className="w-full">
-                <Calculado etiqueta="IMC" valor={imc ? imc.toFixed(1) : null} color={imc ? nivelColor(imc, [25, 30, 35]) : undefined} />
+              <div className="flex w-full items-center justify-between rounded-lg border border-hud-borde bg-hud-fondo/50 px-3 py-2">
+                <span className="text-xs uppercase tracking-wider text-hud-suave">Categoría</span>
+                <span className="font-mono text-sm font-bold" style={{ color: imcNumero ? tinta(colorImc(imcNumero)) : "var(--color-hud-tenue)" }}>
+                  {!imcNumero ? "—" : imcNumero < 18.5 ? "Bajo peso" : imcNumero < 25 ? "Normal" : imcNumero < 30 ? "Sobrepeso" : "Obesidad"}
+                </span>
               </div>
             </div>
           </div>
         </Panel>
 
-        <Panel titulo="Laboratorio actual">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Campo etiqueta={<>Glucosa en ayunas <Unidad>(mg/dL)</Unidad></>} htmlFor="glucosa" ayuda="Rango válido: 40 a 400">
-              <Entrada id="glucosa" required type="number" min={40} max={400} value={glucosa} onChange={(e) => setGlucosa(e.target.value)} />
-            </Campo>
-            <Campo etiqueta={<>Insulina en ayunas <Unidad>(µU/mL)</Unidad></>} htmlFor="insulina" ayuda="Rango válido: 1 a 100">
-              <Entrada id="insulina" required type="number" step="0.1" min={1} max={100} value={insulina} onChange={(e) => setInsulina(e.target.value)} />
-            </Campo>
-            <Campo etiqueta="HbA1c (%) · opcional" htmlFor="hba1c" ayuda="Rango válido: 3 a 15">
-              <Entrada id="hba1c" type="number" step="0.1" min={3} max={15} value={hba1c} onChange={(e) => setHba1c(e.target.value)} />
-            </Campo>
-          </div>
-          <div className="mt-4 sm:w-1/3">
-            <Calculado etiqueta="HOMA-IR" valor={homaIR ? homaIR.toFixed(1) : null} color={homaIR ? nivelColor(homaIR, [2.5, 4, 6]) : undefined} />
+        <Panel titulo="Sedentarismo" descripcion="Nivel habitual de actividad física del paciente.">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {SEDENTARISMO.map((nivel) => (
+              <Opcion
+                key={nivel}
+                activa={sedentarismo === nivel}
+                color={COLOR_SEDENTARISMO[nivel]}
+                titulo={NOMBRE_SEDENTARISMO[nivel]}
+                detalle={DETALLE_SEDENTARISMO[nivel]}
+                onClick={() => setSedentarismo(nivel)}
+              />
+            ))}
           </div>
         </Panel>
 
-        <Panel titulo="Antecedentes">
-          <div className="space-y-4">
-            <Campo etiqueta="Antecedente familiar de diabetes tipo 2" htmlFor="antecedente" ayuda="Si no se sabe, el simulador lo trata como incierto (probabilidad 35%).">
-              <Selector id="antecedente" value={antecedente} onChange={(e) => setAntecedente(e.target.value as typeof antecedente)}>
-                <option value="desconocido">No se sabe / sin dato</option>
-                <option value="si">Sí</option>
-                <option value="no">No</option>
-              </Selector>
-            </Campo>
-            <div className="flex flex-wrap gap-2">
-              <Interruptor activo={hipertension} onCambio={setHipertension}>Hipertensión</Interruptor>
-              <Interruptor activo={tabaquismo} onCambio={setTabaquismo}>Tabaquismo</Interruptor>
-            </div>
-            <Campo etiqueta="Notas clínicas" htmlFor="notas">
-              <AreaTexto id="notas" rows={3} value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Observaciones, tratamiento actual, adherencia…" />
+        <Panel titulo="Antecedentes" descripcion="¿Algún familiar directo tiene diabetes tipo 2?">
+          <div className="grid grid-cols-2 gap-3 sm:max-w-sm">
+            <Opcion activa={antecedente} color="#f43f5e" titulo="Sí" detalle="Mayor carga genética" onClick={() => setAntecedente(true)} />
+            <Opcion activa={!antecedente} color="#34d399" titulo="No" detalle="Sin carga genética" onClick={() => setAntecedente(false)} />
+          </div>
+          <div className="mt-4">
+            <Campo etiqueta="Notas clínicas · opcional" htmlFor="notas">
+              <AreaTexto id="notas" rows={3} value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Observaciones del médico…" />
             </Campo>
           </div>
         </Panel>

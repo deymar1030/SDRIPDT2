@@ -2,25 +2,18 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FlaskConical, Search, UserPlus, Users } from "lucide-react";
 import { Shell } from "../components/Shell";
-import { StageBadge } from "../components/StageBadge";
+import { SedentarismoBadge } from "../components/SedentarismoBadge";
 import { Aviso, Avatar, BotonEnlace, Cargando, Panel, Vacio, claseTabla } from "../components/ui";
 import { api } from "../api/client";
-import type { Etapa, Paciente } from "../types";
-
-const FILTROS: { valor: Etapa | "todas"; etiqueta: string }[] = [
-  { valor: "todas", etiqueta: "Todas" },
-  { valor: "sano", etiqueta: "Sano" },
-  { valor: "resistencia", etiqueta: "Resistencia" },
-  { valor: "prediabetes", etiqueta: "Prediabetes" },
-  { valor: "diabetes", etiqueta: "Diabetes" },
-];
+import { NOMBRE_SEDENTARISMO, SEDENTARISMO } from "../lib/perfil";
+import type { Paciente, Sedentarismo } from "../types";
 
 export default function Patients() {
   const navigate = useNavigate();
   const [pacientes, setPacientes] = useState<Paciente[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState("");
-  const [filtro, setFiltro] = useState<Etapa | "todas">("todas");
+  const [filtro, setFiltro] = useState<Sedentarismo | "todos">("todos");
 
   useEffect(() => {
     api.listarPacientes().then(setPacientes).catch((e) => setError(e.message));
@@ -29,7 +22,7 @@ export default function Patients() {
   const filtrados = useMemo(() => {
     if (!pacientes) return [];
     const q = busqueda.trim().toLowerCase();
-    return pacientes.filter((p) => p.nombre.toLowerCase().includes(q) && (filtro === "todas" || p.etapaActual === filtro));
+    return pacientes.filter((p) => p.nombre.toLowerCase().includes(q) && (filtro === "todos" || p.sedentarismo === filtro));
   }, [pacientes, busqueda, filtro]);
 
   return (
@@ -52,15 +45,15 @@ export default function Patients() {
         </div>
 
         <div className="mb-4 flex flex-wrap gap-2">
-          {FILTROS.map((f) => (
+          {(["todos", ...SEDENTARISMO] as const).map((valor) => (
             <button
-              key={f.valor}
-              onClick={() => setFiltro(f.valor)}
+              key={valor}
+              onClick={() => setFiltro(valor)}
               className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
-                filtro === f.valor ? "border-hud-acento bg-hud-acento/15 text-white" : "border-hud-borde text-hud-suave hover:text-white"
+                filtro === valor ? "border-hud-acento bg-hud-acento/15 text-white" : "border-hud-borde text-hud-suave hover:text-white"
               }`}
             >
-              {f.etiqueta}
+              {valor === "todos" ? "Todos" : `Sedentarismo ${NOMBRE_SEDENTARISMO[valor].toLowerCase()}`}
             </button>
           ))}
         </div>
@@ -80,11 +73,8 @@ export default function Patients() {
                 <tr className={claseTabla.encabezado}>
                   <th className={claseTabla.celdaEncabezado}>Paciente</th>
                   <th className={claseTabla.celdaEncabezado}>IMC</th>
-                  <th className={claseTabla.celdaEncabezado}>Glucosa</th>
-                  <th className={claseTabla.celdaEncabezado}>Insulina</th>
-                  <th className={claseTabla.celdaEncabezado}>HbA1c</th>
-                  <th className={claseTabla.celdaEncabezado}>HOMA-IR</th>
-                  <th className={claseTabla.celdaEncabezado}>Etapa actual</th>
+                  <th className={claseTabla.celdaEncabezado}>Sedentarismo</th>
+                  <th className={claseTabla.celdaEncabezado}>Antecedentes</th>
                   <th className={claseTabla.celdaEncabezado} />
                 </tr>
               </thead>
@@ -96,16 +86,15 @@ export default function Patients() {
                         <Avatar nombre={p.nombre} tamano={34} />
                         <div>
                           <p className="font-medium text-white">{p.nombre}</p>
-                          <p className="text-xs text-hud-tenue">{p.edad} años{p.sexo ? ` · ${p.sexo}` : ""}</p>
+                          <p className="text-xs text-hud-tenue">{p.edad} años</p>
                         </div>
                       </div>
                     </td>
                     <td className={`${claseTabla.celda} font-mono text-hud-texto`}>{p.imc}</td>
-                    <td className={`${claseTabla.celda} font-mono text-hud-texto`}>{p.glucosa} <span className="text-[10px] text-hud-tenue">mg/dL</span></td>
-                    <td className={`${claseTabla.celda} font-mono text-hud-texto`}>{p.insulina} <span className="text-[10px] text-hud-tenue">µU/mL</span></td>
-                    <td className={`${claseTabla.celda} font-mono text-hud-texto`}>{p.hba1c != null ? `${p.hba1c}%` : "—"}</td>
-                    <td className={`${claseTabla.celda} font-mono font-semibold text-white`}>{p.homaIR}</td>
-                    <td className={claseTabla.celda}><StageBadge etapa={p.etapaActual} /></td>
+                    <td className={claseTabla.celda}><SedentarismoBadge nivel={p.sedentarismo} /></td>
+                    <td className={`${claseTabla.celda} text-hud-texto`}>
+                      {p.antecedente_familiar == null ? <span className="text-hud-tenue">Sin dato</span> : p.antecedente_familiar ? "Sí" : "No"}
+                    </td>
                     <td className={`${claseTabla.celda} text-right`} onClick={(e) => e.stopPropagation()}>
                       <BotonEnlace to={`/simulador?id=${p.id}`} variante="secundario" tamano="sm" icono={<FlaskConical size={13} />}>
                         Simular

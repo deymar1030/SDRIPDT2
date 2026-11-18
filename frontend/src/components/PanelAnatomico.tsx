@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { Etapa, Paciente, PuntoAnual } from "../types";
+import type { Etapa, Paciente, PuntoSerie } from "../types";
 import { useTema } from "../tema/TemaContext";
 import { tinta } from "./ui";
 
@@ -9,50 +9,49 @@ const FONDO_OSCURO =
 const FONDO_CLARO =
   "linear-gradient(rgba(8,145,178,0.07) 1px, transparent 1px) 0 0/28px 28px, linear-gradient(90deg, rgba(8,145,178,0.07) 1px, transparent 1px) 0 0/28px 28px, radial-gradient(ellipse at 50% 40%, #ffffff 0%, #eef5fc 60%, #e2ecf7 100%)";
 
-/** Estado fisiológico que dibuja el panel: labs observables + variables
- *  latentes del modelo (componentes B y C del documento formal). */
+const S_I_IDEAL = 1.8;
+
+/** Estado fisiológico que dibuja el panel: glucosa, insulina, masa beta y sensibilidad del modelo de Topp. */
 export interface EstadoAnatomico {
   glucosa: number;
   insulina: number;
   homaIR: number;
-  reserva: number; // C_β, % de capacidad de células beta
-  sensibilidad: number; // S_I, 1.0 = sensibilidad normal
-  adiposo: number; // M_adip, kg de grasa acumulada
+  reserva: number; // masa beta, % de la masa inicial
+  sensibilidad: number; // S_I
+  adiposo: number; // kg de grasa por encima de la referencia (IMC 22)
   imc: number;
   hba1c?: number | null;
   etapa: Etapa;
   etapaPct?: Record<Etapa, number>;
 }
 
+const grasaDesdeImc = (imc: number) => Math.max(0, (imc - 22) * 2.5);
+
 export function estadoDesdePaciente(p: Paciente): EstadoAnatomico {
   return {
-    glucosa: p.glucosa,
-    insulina: p.insulina,
-    homaIR: p.homaIR,
-    reserva: p.estadoLatente.cBeta0,
+    glucosa: 90,
+    insulina: 10,
+    homaIR: (90 * 10) / 405,
+    reserva: 100,
     sensibilidad: p.estadoLatente.sI0,
-    adiposo: p.estadoLatente.mAdip0,
+    adiposo: grasaDesdeImc(p.imc),
     imc: p.imc,
-    hba1c: p.hba1c,
-    etapa: p.etapaActual,
+    etapa: "sano",
   };
 }
 
 const ORDEN_ETAPAS: Etapa[] = ["sano", "resistencia", "prediabetes", "diabetes"];
 
-export function estadoDesdeAnio(punto: PuntoAnual): EstadoAnatomico {
+export function estadoDesdeAnio(punto: PuntoSerie, imc: number): EstadoAnatomico {
   const etapa = ORDEN_ETAPAS.reduce((mejor, e) => (punto.etapaPct[e] > punto.etapaPct[mejor] ? e : mejor), "sano" as Etapa);
-  const adiposo = punto.adiposo?.p50 ?? 0;
   return {
     glucosa: punto.glucosa.p50,
     insulina: punto.insulina.p50,
     homaIR: punto.homaIR.p50,
-    reserva: punto.reserva.p50,
-    // corridas guardadas antes de exponer S_I: se aproxima por R_HOMA = 1/S_I
-    sensibilidad: punto.sensibilidad?.p50 ?? 1 / Math.max(punto.homaIR.p50, 0.5),
-    adiposo,
-    // inversa de M_adip0 = (IMC − 22)·2.5 usada por el motor
-    imc: 22 + adiposo / 2.5,
+    reserva: punto.masaBeta.p50,
+    sensibilidad: punto.sensibilidad.p50,
+    adiposo: grasaDesdeImc(imc),
+    imc,
     etapa,
     etapaPct: punto.etapaPct,
   };
@@ -178,8 +177,8 @@ export function PanelAnatomico({ estado, momento, escaneando = false, children }
   const nHoma = nivelAscendente(estado.homaIR, [2.5, 4, 6]);
   const nImc = nivelAscendente(estado.imc, [25, 30, 35]);
   const nHba1c = estado.hba1c != null ? nivelAscendente(estado.hba1c, [5.7, 6.0, 6.5]) : 0;
-  const nReserva = nivelDescendente(estado.reserva, [70, 40, 20]);
-  const nSensibilidad = nivelDescendente(estado.sensibilidad, [0.4, 0.25, 0.15]);
+  const nReserva = nivelDescendente(estado.reserva, [85, 70, 55]);
+  const nSensibilidad = nivelDescendente((estado.sensibilidad / S_I_IDEAL) * 100, [85, 70, 55]);
   const nAdiposo = nivelAscendente(estado.adiposo, [7.5, 20, 30]);
   const nEtapa = ORDEN_ETAPAS.indexOf(estado.etapa);
   const [claro, oscuro] = COLOR_CUERPO[estado.etapa];
@@ -220,7 +219,7 @@ export function PanelAnatomico({ estado, momento, escaneando = false, children }
           {estado.hba1c != null && (
             <FilaLab etiqueta="HbA1c" valor={estado.hba1c.toFixed(1)} unidad="%" nivel={nHba1c} pct={((estado.hba1c - 4) / 6) * 100} />
           )}
-          <FilaLab etiqueta={estado.etapaPct ? "IMC estimado" : "IMC"} valor={estado.imc.toFixed(1)} unidad="" nivel={nImc} pct={((estado.imc - 15) / 25) * 100} />
+          <FilaLab etiqueta="IMC" valor={estado.imc.toFixed(1)} unidad="" nivel={nImc} pct={((estado.imc - 15) / 25) * 100} />
         </div>
 
         {/* Silueta */}
@@ -295,15 +294,15 @@ export function PanelAnatomico({ estado, momento, escaneando = false, children }
 
         {/* Órganos */}
         <div className="grid grid-cols-2 gap-2.5">
-          <PanelOrgano archivo="pancreas" nombre="Páncreas" valor={`${estado.reserva.toFixed(0)}%`} detalle="Reserva β (C_β)" nivel={nReserva} />
+          <PanelOrgano archivo="pancreas" nombre="Páncreas" valor={`${estado.reserva.toFixed(0)}%`} detalle="Masa beta (β)" nivel={nReserva} />
           <PanelOrgano
             archivo="liver"
             nombre="Hígado y músculo"
-            valor={`${Math.min(150, estado.sensibilidad * 100).toFixed(0)}%`}
+            valor={estado.sensibilidad.toFixed(2)}
             detalle="Sensibilidad (S_I)"
             nivel={nSensibilidad}
           />
-          <PanelOrgano archivo="tissue" nombre="Tejido adiposo" valor={`${estado.adiposo.toFixed(1)} kg`} detalle="Grasa acumulada" nivel={nAdiposo} />
+          <PanelOrgano archivo="tissue" nombre="Tejido adiposo" valor={`IMC ${estado.imc.toFixed(1)}`} detalle="Carga adiposa" nivel={nAdiposo} />
           <PanelOrgano
             archivo="blood-drop"
             nombre="Metabolismo"

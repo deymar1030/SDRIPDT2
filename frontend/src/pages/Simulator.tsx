@@ -1,33 +1,37 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Plus, Trash2, History, X, Play, Pause, FlaskConical, ChevronDown, Pencil, UtensilsCrossed, Dumbbell, CalendarRange } from "lucide-react";
+import { Plus, Trash2, History, X, Play, Pause, FlaskConical, ChevronDown, Pencil, Activity, Scale, CalendarRange } from "lucide-react";
 import { ModalEscenario } from "../components/ModalEscenario";
-import { resumenEscenario } from "../lib/intervencion";
+import { NOMBRE_NIVEL, resumenEscenario, textoAntecedente } from "../lib/perfil";
 import { Shell } from "../components/Shell";
 import { StageBadge } from "../components/StageBadge";
+import { SedentarismoBadge } from "../components/SedentarismoBadge";
 import { SegmentedBar } from "../components/SegmentedBar";
 import { TrajectoryChart, PALETA_ESCENARIOS } from "../components/TrajectoryChart";
+import {
+  BarrasTiempoLibre,
+  GraficaIncidencia,
+  GraficaPreDiagnostico,
+  HistogramaDiagnostico,
+  PanelCuatroGraficas,
+  type ModoPanel,
+} from "../components/GraficasInforme";
 import { PanelAnatomico, estadoDesdeAnio, estadoDesdePaciente } from "../components/PanelAnatomico";
 import { Aviso, Avatar, Boton, Campo, Panel, Selector, claseTabla, tinta } from "../components/ui";
 import { api } from "../api/client";
-import type { DatosEscenario, Escenario, NivelIntervencion, Paciente, SimulateResponse, SimulationRunSummary } from "../types";
+import type { DatosEscenario, Escenario, Paciente, PuntoSerie, ResultadoEscenario, SimulateResponse, SimulationRunSummary } from "../types";
 
 function formatearFecha(iso: string) {
   return new Date(iso).toLocaleString("es-BO", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-const NOMBRE_NIVEL: Record<NivelIntervencion, string> = {
-  nula: "Sin intervención",
-  moderada: "Intervención moderada",
-  intensiva: "Intervención intensiva",
-  personalizada: "Intervención personalizada",
-};
-
 const MARCADORES = [
-  { clave: "homaIR" as const, etiqueta: "HOMA-IR", unidad: "" },
   { clave: "glucosa" as const, etiqueta: "Glucosa", unidad: "mg/dL" },
   { clave: "insulina" as const, etiqueta: "Insulina", unidad: "µU/mL" },
-  { clave: "reserva" as const, etiqueta: "Reserva pancreática", unidad: "%" },
+  { clave: "homaIR" as const, etiqueta: "HOMA-IR", unidad: "" },
+  { clave: "homaBeta" as const, etiqueta: "HOMA-β", unidad: "% función" },
+  { clave: "deficitBeta" as const, etiqueta: "Déficit beta", unidad: "%" },
+  { clave: "sensibilidad" as const, etiqueta: "Sensibilidad S_I", unidad: "S_I" },
 ];
 
 function Pestana({ activa, onClick, children }: { activa: boolean; onClick: () => void; children: ReactNode }) {
@@ -43,6 +47,15 @@ function Pestana({ activa, onClick, children }: { activa: boolean; onClick: () =
   );
 }
 
+function puntosAnuales(r: ResultadoEscenario): PuntoSerie[] {
+  return r.serie.filter((p) => Math.abs(p.anio - Math.round(p.anio)) < 1e-6);
+}
+
+function textoTiempo(r: ResultadoEscenario, horizonte: number) {
+  if (r.sinDiabetesEnHorizonte) return `> ${horizonte} años`;
+  return `${r.tiempoMedianoDiagnostico?.toFixed(1)} años`;
+}
+
 export default function Simulator() {
   const [params, setParams] = useSearchParams();
   const pacienteId = params.get("id");
@@ -53,7 +66,8 @@ export default function Simulator() {
   const [resultados, setResultados] = useState<SimulateResponse | null>(null);
   const [horizonte, setHorizonte] = useState(10);
   const [trayectorias, setTrayectorias] = useState(200);
-  const [marcador, setMarcador] = useState<(typeof MARCADORES)[number]["clave"]>("homaIR");
+  const [marcador, setMarcador] = useState<(typeof MARCADORES)[number]["clave"]>("glucosa");
+  const [modoPanel, setModoPanel] = useState<ModoPanel>("individual");
   const [modal, setModal] = useState<{ abierto: boolean; escenario: Escenario | null }>({ abierto: false, escenario: null });
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +81,6 @@ export default function Simulator() {
 
   const ultimoAnio = resultados ? resultados.horizonteAnios : 0;
 
-  // reproducción año a año del escenario elegido en el panel anatómico
   useEffect(() => {
     if (!reproduciendo || !resultados) return;
     if (anioVista >= ultimoAnio) {
@@ -93,7 +106,6 @@ export default function Simulator() {
   useEffect(() => {
     if (!pacienteId) return;
     setErrorPaciente(null);
-    // Un médico solo accede a sus pacientes: si el id es de otro (o no existe) la API responde 404.
     api.obtenerPaciente(Number(pacienteId)).then(setPaciente).catch((e) => {
       setPaciente(null);
       setErrorPaciente(e instanceof Error ? e.message : "No se pudo cargar al paciente");
@@ -127,8 +139,7 @@ export default function Simulator() {
     if (!pacienteId) return;
     setCargandoComparacion(runId);
     try {
-      const anterior = await api.obtenerSimulacion(Number(pacienteId), runId);
-      setComparacion(anterior);
+      setComparacion(await api.obtenerSimulacion(Number(pacienteId), runId));
     } finally {
       setCargandoComparacion(null);
     }
@@ -155,15 +166,17 @@ export default function Simulator() {
     setEscenarios((prev) => prev.filter((e) => e.id !== id));
   }
 
+  const resultadoVista = resultados?.resultados[Math.min(escenarioVista, resultados.resultados.length - 1)];
+  const colorVista = PALETA_ESCENARIOS[escenarioVista % PALETA_ESCENARIOS.length];
+
   return (
-    <Shell titulo="Simulador de pronóstico" subtitulo="Monte Carlo · dinámica de sistemas en tiempo discreto">
+    <Shell titulo="Simulador de pronóstico" subtitulo="Monte Carlo · modelo de Topp et al. en pasos de 1/5 de día">
       {errorPaciente && (
         <div className="mb-5">
           <Aviso tipo="error">{errorPaciente}. Elige otro paciente de la lista.</Aviso>
         </div>
       )}
 
-      {/* Selección de paciente */}
       <Panel className="mb-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -186,23 +199,19 @@ export default function Simulator() {
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-sm text-hud-suave">
               <span>{paciente.edad} años</span>
               <span>IMC <b className="text-white">{paciente.imc}</b></span>
-              <span>Glucosa <b className="text-white">{paciente.glucosa}</b></span>
-              <span>Insulina <b className="text-white">{paciente.insulina}</b></span>
-              <span>HOMA-IR <b className="text-white">{paciente.homaIR}</b></span>
-              <StageBadge etapa={paciente.etapaActual} />
+              <SedentarismoBadge nivel={paciente.sedentarismo} />
+              <span className="font-sans text-xs">{textoAntecedente(paciente.antecedente_familiar)}</span>
             </div>
           )}
         </div>
       </Panel>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[300px_1fr]">
-        {/* Configuración */}
         <aside className="space-y-5">
-          <Panel titulo="Escenarios a comparar" descripcion="Hasta 4. Cada uno es un “¿y si…?” sobre los hábitos del paciente.">
+          <Panel titulo="Escenarios a comparar" descripcion="Hasta 4. Cada uno es un “¿y si…?” sobre el estilo de vida del paciente.">
             <div className="space-y-2">
               {escenarios.map((esc, i) => {
                 const color = PALETA_ESCENARIOS[i % PALETA_ESCENARIOS.length];
-                const r = resumenEscenario(esc);
                 return (
                   <div key={esc.id} className="group rounded-lg border border-hud-borde bg-hud-fondo/40 px-3 py-2.5">
                     <div className="flex items-start gap-3">
@@ -220,11 +229,12 @@ export default function Simulator() {
                         </button>
                       </div>
                     </div>
-                    <ul className="mt-2 space-y-1 pl-5 text-[11px] text-hud-suave">
-                      <li className="flex items-center gap-1.5"><UtensilsCrossed size={12} className="flex-shrink-0 text-hud-tenue" /> {r.dieta}</li>
-                      <li className="flex items-center gap-1.5"><Dumbbell size={12} className="flex-shrink-0 text-hud-tenue" /> {r.ejercicio}</li>
-                      {r.calendario && <li className="flex items-center gap-1.5"><CalendarRange size={12} className="flex-shrink-0 text-hud-tenue" /> {r.calendario}</li>}
-                    </ul>
+                    {paciente && (
+                      <p className="mt-2 flex items-center gap-1.5 pl-5 text-[11px] text-hud-suave">
+                        {esc.nivel_intervencion === "nula" ? <Activity size={12} className="flex-shrink-0 text-hud-tenue" /> : esc.parametros?.inicio_anio ? <CalendarRange size={12} className="flex-shrink-0 text-hud-tenue" /> : <Scale size={12} className="flex-shrink-0 text-hud-tenue" />}
+                        {resumenEscenario(esc, paciente.sedentarismo)}
+                      </p>
+                    )}
                   </div>
                 );
               })}
@@ -255,7 +265,7 @@ export default function Simulator() {
               <Campo etiqueta={`Años a proyectar · ${horizonte}`} htmlFor="horizonte">
                 <input id="horizonte" type="range" min={1} max={20} value={horizonte} onChange={(e) => setHorizonte(+e.target.value)} className="w-full" />
               </Campo>
-              <Campo etiqueta="Trayectorias simuladas" htmlFor="trayectorias" ayuda="Más trayectorias = bandas de incertidumbre más estables.">
+              <Campo etiqueta="Trayectorias simuladas" htmlFor="trayectorias" ayuda="Más trayectorias = bandas más estables, pero tarda más.">
                 <Selector id="trayectorias" value={trayectorias} onChange={(e) => setTrayectorias(+e.target.value)}>
                   <option value={100}>100</option>
                   <option value={200}>200</option>
@@ -296,13 +306,14 @@ export default function Simulator() {
           )}
         </aside>
 
-        {/* Resultados */}
         <div className="min-w-0 space-y-5">
           {paciente && (() => {
-            const escenarioActual = resultados?.resultados[escenarioVista];
-            const punto = escenarioActual?.resumenAnual[Math.min(anioVista, escenarioActual.resumenAnual.length - 1)];
-            const estado = punto ? estadoDesdeAnio(punto) : estadoDesdePaciente(paciente);
-            const momento = punto && escenarioActual ? `Año ${punto.anio} · ${escenarioActual.nombre}` : "Hoy";
+            const anuales = resultadoVista ? puntosAnuales(resultadoVista) : [];
+            const punto = anuales[Math.min(anioVista, anuales.length - 1)];
+            const cambio = resultadoVista?.intervencion;
+            const imcEnTiempo = cambio?.cambia && anioVista >= cambio.inicioAnio ? cambio.imc : paciente.imc;
+            const estado = punto ? estadoDesdeAnio(punto, imcEnTiempo) : estadoDesdePaciente(paciente);
+            const momento = punto && resultadoVista ? `Año ${anioVista} · ${resultadoVista.nombre}` : "Estado inicial";
             return (
               <PanelAnatomico estado={estado} momento={momento} escaneando={cargando}>
                 {resultados ? (
@@ -343,14 +354,14 @@ export default function Simulator() {
                   </div>
                 ) : (
                   <p className="text-xs text-sky-200/60">
-                    Estado de hoy. Define los escenarios y presiona "Ejecutar simulación" para ver cómo evolucionaría año a año.
+                    Estado inicial del modelo. Define los escenarios y presiona "Ejecutar simulación" para ver cómo evolucionaría año a año.
                   </p>
                 )}
               </PanelAnatomico>
             );
           })()}
 
-          {resultados && (
+          {resultados && resultadoVista && (
             <>
               <Panel titulo="Comparación entre escenarios">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -361,9 +372,13 @@ export default function Simulator() {
                         <span className="absolute inset-x-0 top-0 h-0.5" style={{ backgroundColor: color, boxShadow: `0 0 10px ${color}` }} />
                         <p className="truncate text-xs font-medium text-hud-suave">{r.nombre}</p>
                         <p className="mt-1 font-mono text-3xl font-bold" style={{ color: tinta(color), textShadow: `0 0 16px ${color}66` }}>{r.prob5}%</p>
-                        <p className="text-[11px] text-hud-tenue">prob. de diabetes a 5 años</p>
+                        <p className="text-[11px] text-hud-tenue">prob. de diabetes a {Math.min(5, resultados.horizonteAnios)} años</p>
                         <p className="mt-2 text-sm text-hud-texto">
                           <span className="font-mono font-semibold">{r.probHorizonte}%</span> a {resultados.horizonteAnios} años
+                        </p>
+                        <p className="mt-1 text-xs text-hud-suave">
+                          Diagnóstico mediano: <b className="font-mono text-white">{textoTiempo(r, resultados.horizonteAnios)}</b>
+                          {r.edadMedianaDiagnostico != null && <span> (a los {r.edadMedianaDiagnostico.toFixed(0)} años)</span>}
                         </p>
                         <StageBadge etapa={r.etapaMediana} className="mt-2" />
                       </div>
@@ -422,7 +437,54 @@ export default function Simulator() {
               )}
 
               <Panel
-                titulo="Trayectoria proyectada"
+                titulo={`Perfil metabólico · ${resultadoVista.nombre}`}
+                descripcion="Las cuatro gráficas del informe: glucemia, secreción de insulina, pérdida de células beta y sensibilidad."
+                acciones={
+                  <div className="flex flex-wrap gap-2">
+                    {resultados.resultados.length > 1 && resultados.resultados.map((r, i) => (
+                      <Pestana key={r.escenarioId} activa={i === escenarioVista} onClick={() => setEscenarioVista(i)}>{r.nombre}</Pestana>
+                    ))}
+                    <Pestana activa={modoPanel === "individual"} onClick={() => setModoPanel("individual")}>Una trayectoria</Pestana>
+                    <Pestana activa={modoPanel === "mediana"} onClick={() => setModoPanel("mediana")}>Mediana y banda</Pestana>
+                  </div>
+                }
+              >
+                <PanelCuatroGraficas resultado={resultadoVista} modo={modoPanel} color={colorVista} />
+                <p className="mt-3 text-xs text-hud-tenue">
+                  {modoPanel === "individual"
+                    ? "Trayectoria representativa: la simulación cuyo diagnóstico está más cerca de la mediana, como el gráfico individual del informe."
+                    : "Línea: mediana de las trayectorias; sombra: percentiles 10 a 90."}
+                </p>
+              </Panel>
+
+              <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                <Panel titulo="Tiempo libre de diabetes" descripcion="Años hasta el diagnóstico mediano de cada escenario.">
+                  <BarrasTiempoLibre resultados={resultados.resultados} horizonte={resultados.horizonteAnios} />
+                </Panel>
+                <Panel titulo="Incidencia acumulada" descripcion="Porcentaje de trayectorias que llegaron a 126 mg/dL con el paso del tiempo.">
+                  <GraficaIncidencia resultados={resultados.resultados} horizonte={resultados.horizonteAnios} />
+                </Panel>
+              </div>
+
+              <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                <Panel titulo="Antes del diagnóstico" descripcion={`Glucemia de las trayectorias diagnosticadas, alineadas al momento del diagnóstico · ${resultadoVista.nombre}.`}>
+                  {resultadoVista.preDiagnostico.length > 0 ? (
+                    <GraficaPreDiagnostico resultado={resultadoVista} color={colorVista} />
+                  ) : (
+                    <p className="py-10 text-center text-sm text-hud-tenue">Este escenario casi no tiene diagnósticos en el horizonte elegido.</p>
+                  )}
+                </Panel>
+                <Panel titulo="Dispersión del diagnóstico" descripcion={`Cuántas trayectorias se diagnostican en cada año · ${resultadoVista.nombre}.`}>
+                  {resultadoVista.tiemposDiagnostico.length > 0 ? (
+                    <HistogramaDiagnostico resultado={resultadoVista} color={colorVista} horizonte={resultados.horizonteAnios} />
+                  ) : (
+                    <p className="py-10 text-center text-sm text-hud-tenue">Ninguna trayectoria se diagnostica dentro del horizonte.</p>
+                  )}
+                </Panel>
+              </div>
+
+              <Panel
+                titulo="Comparación de trayectorias"
                 acciones={MARCADORES.map((m) => (
                   <Pestana key={m.clave} activa={marcador === m.clave} onClick={() => setMarcador(m.clave)}>{m.etiqueta}</Pestana>
                 ))}
@@ -443,7 +505,7 @@ export default function Simulator() {
                         <span className="truncate">{r.nombre}</span>
                       </span>
                       <div className="flex-1">
-                        <SegmentedBar pct={r.resumenAnual[r.resumenAnual.length - 1].etapaPct} />
+                        <SegmentedBar pct={r.serie[r.serie.length - 1].etapaPct} />
                       </div>
                     </div>
                   ))}
@@ -457,7 +519,7 @@ export default function Simulator() {
                 </summary>
                 <div className="mt-4 grid grid-cols-1 gap-5 md:grid-cols-2">
                   <div>
-                    <h3 className="mb-2 text-xs uppercase tracking-wider text-hud-suave">Variables de entrada (sorteadas cada semana)</h3>
+                    <h3 className="mb-2 text-xs uppercase tracking-wider text-hud-suave">Variables aleatorias</h3>
                     <div className="space-y-2">
                       {resultados.supuestos.variablesAleatorias.map((v) => (
                         <div key={v.simbolo} className="rounded-lg border border-hud-borde bg-hud-fondo/40 p-2.5 text-xs">
@@ -470,12 +532,13 @@ export default function Simulator() {
                     </div>
                   </div>
                   <div>
-                    <h3 className="mb-2 text-xs uppercase tracking-wider text-hud-suave">Estado inicial estimado del paciente</h3>
-                    <div className="grid grid-cols-3 gap-2 text-center">
+                    <h3 className="mb-2 text-xs uppercase tracking-wider text-hud-suave">Estado inicial del paciente</h3>
+                    <div className="grid grid-cols-2 gap-2 text-center">
                       {[
-                        ["S_I", "sensibilidad", resultados.resultados[0]?.estadoInicial.sI0],
-                        ["C_β", "reserva %", resultados.resultados[0]?.estadoInicial.cBeta0],
-                        ["M_adip", "kg", resultados.resultados[0]?.estadoInicial.mAdip0],
+                        ["S_I0", "sensibilidad inicial", resultadoVista.estadoInicial.sI0],
+                        ["k_VAT", "desgaste adiposo", resultadoVista.estadoInicial.kVat],
+                        ["riesgo_vida", "media sorteada", resultadoVista.estadoInicial.riesgoVida],
+                        ["a_gen", "media sorteada", resultadoVista.estadoInicial.aGen],
                       ].map(([simbolo, detalle, valor]) => (
                         <div key={simbolo} className="rounded-lg border border-hud-borde bg-hud-fondo/40 p-2.5">
                           <p className="font-mono text-[11px] text-hud-acento">{simbolo}</p>
@@ -493,12 +556,12 @@ export default function Simulator() {
                         </div>
                       ))}
                     </div>
+                    <p className="mt-3 text-xs text-hud-tenue">Semilla aleatoria de esta corrida: <span className="font-mono text-white">{resultados.semilla}</span></p>
                   </div>
                 </div>
                 <p className="mt-4 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-200">
-                  Las constantes se calibraron contra rangos publicados en la literatura (p. ej., el Diabetes Prevention
-                  Program); todavía no se validaron con datos locales de SNIS-VE / SEDES La Paz / IDF. Los resultados son
-                  pronósticos orientativos con incertidumbre, no diagnósticos.
+                  El modelo usa las constantes teóricas de Topp et al. adaptadas en el informe; todavía no se calibró ni validó con
+                  datos locales (SNIS-VE / SEDES La Paz). Los resultados son pronósticos orientativos con incertidumbre, no diagnósticos.
                 </p>
               </details>
             </>

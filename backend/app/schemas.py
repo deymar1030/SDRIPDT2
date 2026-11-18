@@ -4,7 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 NivelIntervencion = Literal["nula", "moderada", "intensiva", "personalizada"]
-IntensidadEjercicio = Literal["ligera", "moderada", "vigorosa"]
+Sedentarismo = Literal["activo", "moderado", "severo"]
 Etapa = Literal["sano", "resistencia", "prediabetes", "diabetes"]
 
 
@@ -57,19 +57,17 @@ class PasswordChange(BaseModel):
 
 # ---------------- Pacientes ----------------
 class PatientCreate(BaseModel):
-    nombre: str
-    edad: int = Field(ge=1, le=110)
-    sexo: str | None = None
+    nombre: str = Field(min_length=1, max_length=160)
+    edad: int = Field(ge=18, le=100)
     imc: float = Field(ge=12, le=70)
-    peso: float | None = Field(default=None, ge=20, le=300)
-    talla: float | None = Field(default=None, ge=100, le=230)
-    glucosa: float = Field(ge=40, le=400)
-    insulina: float = Field(ge=1, le=100)
-    hba1c: float | None = Field(default=None, ge=3, le=15)
-    antecedente_familiar: bool | None = None
-    hipertension: bool = False
-    tabaquismo: bool = False
+    sedentarismo: Sedentarismo
+    antecedente_familiar: bool
     notas: str | None = None
+
+
+class EstadoPaciente(BaseModel):
+    sI0: float
+    kVat: float
 
 
 class PatientOut(BaseModel):
@@ -77,32 +75,20 @@ class PatientOut(BaseModel):
     id: int
     nombre: str
     edad: int
-    sexo: str | None
     imc: float
-    peso: float | None = None
-    talla: float | None = None
-    glucosa: float
-    insulina: float
-    hba1c: float | None
+    sedentarismo: Sedentarismo
     antecedente_familiar: bool | None
-    hipertension: bool
-    tabaquismo: bool
     notas: str | None
     creado_en: dt.datetime
-    homaIR: float
-    etapaActual: Etapa
-    estadoLatente: "EstadoInicial"
+    estadoLatente: EstadoPaciente
 
 
 # ---------------- Escenarios ----------------
 class ParametrosIntervencion(BaseModel):
-    """Panel configurable del escenario. Ver app/intervencion.py."""
-    reduccion_kcal_dia: float = Field(default=0, ge=0, le=1000)
-    ejercicio_dias: int = Field(default=0, ge=0, le=7)
-    ejercicio_minutos: int = Field(default=0, ge=0, le=180)
-    ejercicio_intensidad: IntensidadEjercicio = "moderada"
+    """Cambio de estilo de vida del escenario personalizado."""
+    sedentarismo: Sedentarismo
+    imc_objetivo: float | None = Field(default=None, ge=12, le=70)
     inicio_anio: int = Field(default=0, ge=0, le=19)
-    duracion_anios: int | None = Field(default=None, ge=1, le=20)  # None = hasta el final del horizonte
 
 
 class ScenarioCreate(BaseModel):
@@ -126,6 +112,7 @@ class SimulateRequest(BaseModel):
     horizonte_anios: int = Field(default=10, ge=1, le=20)
     trayectorias: int = Field(default=200, ge=50, le=1000)
     escenario_ids: list[int] | None = None  # si es None, usa todos los escenarios guardados del paciente
+    semilla: int | None = Field(default=None, ge=0, le=2**32 - 1)
 
 
 class BandaValores(BaseModel):
@@ -134,36 +121,68 @@ class BandaValores(BaseModel):
     p90: float
 
 
-class PuntoAnual(BaseModel):
-    anio: int
+class PuntoSerie(BaseModel):
+    anio: float
     glucosa: BandaValores
     insulina: BandaValores
     homaIR: BandaValores
-    reserva: BandaValores
-    sensibilidad: BandaValores | None = None  # ausente en corridas guardadas antes de agregarse
-    adiposo: BandaValores | None = None
+    homaBeta: BandaValores
+    deficitBeta: BandaValores
+    masaBeta: BandaValores
+    sensibilidad: BandaValores
+    incidencia: float
     etapaPct: dict[str, float]
+
+
+class PuntoTrayectoria(BaseModel):
+    anio: float
+    glucosa: float
+    insulina: float
+    masaBeta: float
+    sensibilidad: float
+    homaIR: float
+    homaBeta: float
+    deficitBeta: float
+
+
+class PuntoPreDiagnostico(BaseModel):
+    anio: float
+    glucosa: BandaValores
+    n: int
 
 
 class EstadoInicial(BaseModel):
     sI0: float
-    cBeta0: float
-    mAdip0: float
+    kVat: float
+    riesgoVida: float
+    aGen: float
+
+
+class DescripcionCambio(BaseModel):
+    sedentarismo: Sedentarismo
+    imc: float
+    inicioAnio: float
+    cambia: bool
 
 
 class ResultadoEscenario(BaseModel):
     escenarioId: int
     nombre: str
     nivelIntervencion: NivelIntervencion
-    resumenAnual: list[PuntoAnual]
+    serie: list[PuntoSerie]
+    trayectoriaEjemplo: list[PuntoTrayectoria]
+    preDiagnostico: list[PuntoPreDiagnostico]
+    tiemposDiagnostico: list[float]
     prob5: float
     probHorizonte: float
     etapaMediana: Etapa
-    edadMedianaInflexion: float | None
+    tiempoMedianoDiagnostico: float | None
+    edadMedianaDiagnostico: float | None
+    tiempoLibreAnios: float
+    sinDiabetesEnHorizonte: bool
     estadoInicial: EstadoInicial
-    # Ausentes en corridas guardadas antes de los escenarios configurables:
     parametros: ParametrosIntervencion | None = None
-    intervencion: dict | None = None  # efecto resuelto sobre el motor (kcal, dosis R7, ventana)
+    intervencion: DescripcionCambio
 
 
 class VariableAleatoria(BaseModel):
@@ -185,6 +204,7 @@ class SimulateResponse(BaseModel):
     pacienteId: int
     horizonteAnios: int
     trayectorias: int
+    semilla: int
     resultados: list[ResultadoEscenario]
     supuestos: Supuestos
 
@@ -212,8 +232,5 @@ class PacienteRiesgo(BaseModel):
     nombre: str
     edad: int
     imc: float
-    etapaActual: Etapa
+    sedentarismo: Sedentarismo
     ultimaSimulacion: UltimaSimulacionResumen | None
-
-
-PatientOut.model_rebuild()

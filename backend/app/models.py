@@ -27,16 +27,9 @@ class Patient(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     nombre: Mapped[str] = mapped_column(String(160))
     edad: Mapped[int] = mapped_column(Integer)
-    sexo: Mapped[str | None] = mapped_column(String(30), nullable=True)
     imc: Mapped[float] = mapped_column(Float)
-    peso: Mapped[float | None] = mapped_column(Float, nullable=True)   # kg; para convertir ejercicio a kcal
-    talla: Mapped[float | None] = mapped_column(Float, nullable=True)  # cm
-    glucosa: Mapped[float] = mapped_column(Float)
-    insulina: Mapped[float] = mapped_column(Float)
-    hba1c: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sedentarismo: Mapped[str] = mapped_column(String(20), default="moderado", server_default="moderado")  # activo | moderado | severo
     antecedente_familiar: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
-    hipertension: Mapped[bool] = mapped_column(Boolean, default=False)
-    tabaquismo: Mapped[bool] = mapped_column(Boolean, default=False)
     notas: Mapped[str | None] = mapped_column(Text, nullable=True)
     creado_por_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     creado_en: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow)
@@ -53,9 +46,7 @@ class Scenario(Base):
     paciente_id: Mapped[int] = mapped_column(ForeignKey("patients.id"))
     nombre: Mapped[str] = mapped_column(String(120))
     nivel_intervencion: Mapped[str] = mapped_column(String(20), default="nula")  # nula | moderada | intensiva | personalizada
-    # Parámetros del panel configurable (comida, ejercicio, calendario). Si es
-    # None, el escenario usa la tabla fija del nivel (escenarios antiguos).
-    parametros: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    parametros: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # sedentarismo, imc_objetivo, inicio_anio
     creado_en: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow)
 
     paciente: Mapped["Patient"] = relationship(back_populates="escenarios")
