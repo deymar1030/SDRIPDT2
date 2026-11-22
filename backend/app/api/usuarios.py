@@ -9,28 +9,28 @@ los creó.
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from .. import models, schemas
-from ..database import get_db
-from ..security import hash_password, normalizar_correo, requiere_admin
+from .. import esquemas, modelos
+from ..nucleo.base_de_datos import get_db
+from ..nucleo.seguridad import hash_password, normalizar_correo, requiere_admin
 
 router = APIRouter(prefix="/usuarios", tags=["usuarios"])
 
 
 def _admins_activos(db: Session) -> int:
-    return db.query(models.User).filter(models.User.rol == "admin", models.User.activo.is_(True)).count()
+    return db.query(modelos.User).filter(modelos.User.rol == "admin", modelos.User.activo.is_(True)).count()
 
 
-@router.get("", response_model=list[schemas.UserOut])
+@router.get("", response_model=list[esquemas.UserOut])
 def listar_usuarios(db: Session = Depends(get_db), _=Depends(requiere_admin)):
-    return db.query(models.User).order_by(models.User.creado_en.asc(), models.User.id.asc()).all()
+    return db.query(modelos.User).order_by(modelos.User.creado_en.asc(), modelos.User.id.asc()).all()
 
 
-@router.post("", response_model=schemas.UserOut, status_code=201)
-def crear_usuario(datos: schemas.UsuarioCrear, db: Session = Depends(get_db), _=Depends(requiere_admin)):
+@router.post("", response_model=esquemas.UserOut, status_code=201)
+def crear_usuario(datos: esquemas.UsuarioCrear, db: Session = Depends(get_db), _=Depends(requiere_admin)):
     correo = normalizar_correo(datos.correo)
-    if db.query(models.User).filter(models.User.correo == correo).first():
+    if db.query(modelos.User).filter(modelos.User.correo == correo).first():
         raise HTTPException(status_code=400, detail="Ya existe una cuenta con ese correo")
-    usuario = models.User(
+    usuario = modelos.User(
         nombre=datos.nombre.strip(), correo=correo, password_hash=hash_password(datos.password), rol=datos.rol, activo=True,
     )
     db.add(usuario)
@@ -39,14 +39,14 @@ def crear_usuario(datos: schemas.UsuarioCrear, db: Session = Depends(get_db), _=
     return usuario
 
 
-@router.patch("/{usuario_id}", response_model=schemas.UserOut)
+@router.patch("/{usuario_id}", response_model=esquemas.UserOut)
 def actualizar_usuario(
     usuario_id: int,
-    datos: schemas.UsuarioActualizar,
+    datos: esquemas.UsuarioActualizar,
     db: Session = Depends(get_db),
-    admin: models.User = Depends(requiere_admin),
+    admin: modelos.User = Depends(requiere_admin),
 ):
-    usuario = db.get(models.User, usuario_id)
+    usuario = db.get(modelos.User, usuario_id)
     if usuario is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
@@ -64,7 +64,7 @@ def actualizar_usuario(
 
     if "correo" in cambios and cambios["correo"] is not None:
         correo = normalizar_correo(cambios["correo"])
-        if db.query(models.User).filter(models.User.correo == correo, models.User.id != usuario.id).first():
+        if db.query(modelos.User).filter(modelos.User.correo == correo, modelos.User.id != usuario.id).first():
             raise HTTPException(status_code=400, detail="Ya existe una cuenta con ese correo")
         usuario.correo = correo
     if cambios.get("nombre") is not None:

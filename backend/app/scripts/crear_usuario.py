@@ -4,11 +4,11 @@ primer administrador de una base de datos nueva). No hay usuarios
 predefinidos en el código: todos se crean con este script o desde la app.
 
 Uso interactivo (pide la contraseña sin mostrarla):
-    python -m app.crear_usuario --correo admin@hospital.bo --nombre "Ana Pérez" --rol admin
+    python -m app.scripts.crear_usuario --correo admin@hospital.bo --nombre "Ana Pérez" --rol admin
 
 Uso no interactivo (Docker, despliegues): lee variables de entorno
     INIT_USER_CORREO, INIT_USER_NOMBRE, INIT_USER_PASSWORD, INIT_USER_ROL (opcional, por defecto admin)
-    python -m app.crear_usuario --desde-entorno
+    python -m app.scripts.crear_usuario --desde-entorno
   Si esas variables no están definidas no hace nada. Si el correo ya existe,
   no lo modifica (se puede ejecutar en cada arranque sin efectos).
 
@@ -26,9 +26,9 @@ import sys
 from email_validator import EmailNotValidError, validate_email
 from sqlalchemy import inspect
 
-from .database import SessionLocal, engine
-from .models import User
-from .security import hash_password, normalizar_correo
+from ..nucleo.base_de_datos import SessionLocal, engine
+from ..modelos import User
+from ..nucleo.seguridad import hash_password, normalizar_correo
 
 ROLES = ("admin", "medico")
 LARGO_MINIMO_PASSWORD = 1

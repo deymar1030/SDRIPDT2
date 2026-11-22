@@ -1,8 +1,8 @@
-"""Corre fuera del servidor las cuatro personas de prueba del informe (3.4.1) y compara con sus resultados."""
+"""Uso: python -m app.scripts.probar_motor. Corre fuera del servidor las cuatro personas de prueba del informe (3.4.1) y compara con sus resultados."""
 from app.motor import simular_paciente
 
 PERSONAS = [
-    ("Persona 1 · Control", dict(edad=20, imc=19.0, sedentarismo="moderado", antecedente_familiar=True), 30, "18.5 años"),
+    ("Persona 1 · Control", dict(edad=20, imc=19.0, sedentarismo="moderado", antecedente_familiar=False), 30, "18.9 años"),
     ("Persona 2 · Agudo", dict(edad=40, imc=33.5, sedentarismo="severo", antecedente_familiar=True), 10, "1.5 años"),
     ("Persona 3 · Riesgo por inactividad", dict(edad=20, imc=25.0, sedentarismo="severo", antecedente_familiar=False), 10, "5.0 años"),
     ("Persona 4 · Preventivo", dict(edad=65, imc=22.0, sedentarismo="activo", antecedente_familiar=False), 30, "sin diabetes"),

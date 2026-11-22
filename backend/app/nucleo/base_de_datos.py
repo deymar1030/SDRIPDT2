@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-from .config import settings
+from .configuracion import settings
 
 if settings.es_sqlite:
     engine = create_engine(settings.url_base_datos, connect_args={"check_same_thread": False})

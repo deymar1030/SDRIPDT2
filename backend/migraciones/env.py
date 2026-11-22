@@ -3,9 +3,9 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from app.config import settings
-from app.database import Base
-from app import models  # noqa: F401  (registra los modelos en Base.metadata)
+from app.nucleo.configuracion import settings
+from app.nucleo.base_de_datos import Base
+from app import modelos  # noqa: F401  (registra los modelos en Base.metadata)
 
 config = context.config
 # configparser interpreta "%": se duplica para que una contraseña con % no rompa la URL.

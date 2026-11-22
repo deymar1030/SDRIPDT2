@@ -1,6 +1,6 @@
 """Informe 3.3.1 · Módulo parametros.py: constantes fisiológicas y parámetros de diseño."""
 
-DIAS_POR_ANIO = 365
+DIAS_POR_ANIO = 360
 DIAS_POR_MES = 30
 PASOS_POR_DIA = 5
 PASO_EN_DIAS = 1.0 / PASOS_POR_DIA
@@ -45,7 +45,7 @@ GAMMA_ESCALA = 0.5
 UMBRALES_GLUCOTOXICIDAD = (105.0, 115.0, 126.0)
 MULTIPLICADORES_GLUCOTOXICIDAD = (1.5, 3.0, 10.0)
 
-LIMITE_DG = 3.5
+LIMITE_DG = 15.0
 LIMITE_DI = 5.0
 S_I_MINIMA = 0.05
 I_MINIMA = 1.0

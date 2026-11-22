@@ -34,7 +34,7 @@ def cabeceras(cliente, correo, password):
 @pytest.fixture(scope="session")
 def cliente():
     cfg = Config(str(BACKEND / "alembic.ini"))
-    cfg.set_main_option("script_location", str(BACKEND / "alembic"))
+    cfg.set_main_option("script_location", str(BACKEND / "migraciones"))
     command.upgrade(cfg, "head")
     from app.main import app
 
@@ -45,7 +45,7 @@ def cliente():
 @pytest.fixture(scope="session")
 def admin_auth(cliente):
     """Cabeceras del primer admin, creado como en un despliegue real: con el script crear_usuario."""
-    from app.crear_usuario import crear_usuario
+    from app.scripts.crear_usuario import crear_usuario
 
     assert crear_usuario("admin@prueba.bo", "Admin de Prueba", "clave-admin", "admin") == "creado"
     return cabeceras(cliente, "admin@prueba.bo", "clave-admin")

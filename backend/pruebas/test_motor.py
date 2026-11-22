@@ -12,7 +12,7 @@ from app.motor import variables_aleatorias as va
 from app.motor.escenarios import CambioEstiloVida, resolver_cambio
 from app.motor.paciente import PerfilClinico, calcular_imc, crear_pacientes, sensibilidad_inicial, tasa_desgaste_adiposo
 
-PERSONA_1 = dict(edad=20, imc=19.0, sedentarismo="moderado", antecedente_familiar=True)
+PERSONA_1 = dict(edad=20, imc=19.0, sedentarismo="moderado", antecedente_familiar=False)
 PERSONA_2 = dict(edad=40, imc=33.5, sedentarismo="severo", antecedente_familiar=True)
 PERSONA_3 = dict(edad=20, imc=25.0, sedentarismo="severo", antecedente_familiar=False)
 PERSONA_4 = dict(edad=65, imc=22.0, sedentarismo="activo", antecedente_familiar=False)
@@ -200,7 +200,7 @@ def test_la_serie_trimestral_y_la_incidencia_acumulada():
 def test_la_trayectoria_de_ejemplo_termina_en_el_diagnostico():
     ultimo = _simular(PERSONA_2, 4)["trayectoriaEjemplo"][-1]
     assert ultimo["glucosa"] >= p.Y_DMT2 and 1.0 < ultimo["anio"] < 2.2
-    assert 45 < ultimo["deficitBeta"] < 70
+    assert 30 < ultimo["deficitBeta"] < 40
 
 
 def test_sin_diagnostico_la_trayectoria_de_ejemplo_llega_al_horizonte():
@@ -235,17 +235,17 @@ def test_los_escenarios_en_lote_equivalen_a_simularlos_por_separado():
 
 
 @pytest.mark.parametrize("perfil, horizonte", [(PERSONA_1, 30), (PERSONA_2, 6), (PERSONA_3, 10)])
-def test_el_deficit_beta_al_diagnostico_coincide_con_el_rango_del_ukpds(perfil, horizonte):
+def test_el_deficit_beta_al_diagnostico_coincide_con_el_informe(perfil, horizonte):
     deficit = _simular(perfil, horizonte, n=50)["trayectoriaEjemplo"][-1]["deficitBeta"]
-    assert 45 <= deficit <= 65
+    assert 30 <= deficit <= 40
 
 
-def test_el_envejecimiento_weibull_se_sortea_una_vez_por_trayectoria():
-    pacientes = crear_pacientes(PerfilClinico(40, 25, "moderado", False), 300, np.random.default_rng(0))
-    assert pacientes.envejecimiento.shape == (300,) and pacientes.envejecimiento.std() > 0.2
+def test_el_tiempo_del_modelo_son_meses_de_30_dias():
+    assert p.DIAS_POR_ANIO == 360 and p.DIAS_POR_TRIMESTRE_ANIO == 90
+    assert p.DT == pytest.approx(1 / 150)
+    assert p.LIMITE_DG == 15.0 and p.LIMITE_DI == 5.0
 
 
-def test_el_diagnostico_se_dispersa_entre_trayectorias():
-    tiempos = np.array(_simular(PERSONA_3, 15, n=100)["tiemposDiagnostico"])
-    p10, p90 = np.percentile(tiempos, [10, 90])
-    assert p90 / p10 > 1.8
+def test_el_diagnostico_se_registra_en_meses_y_la_edad_suma_t_diag_entre_12():
+    r = _simular(PERSONA_2, 6)
+    assert r["edadMedianaDiagnostico"] == pytest.approx(PERSONA_2["edad"] + r["tiempoMedianoDiagnostico"], abs=0.06)

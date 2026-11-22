@@ -6,4 +6,3 @@ app.db
 app.db.*
 *.bak
 uvicorn.log
-probar_motor.py

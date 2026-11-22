@@ -20,7 +20,7 @@ const K = {
   R_1: 0.001,
   Y_DMT2: 126,
   K_VAT_BASE: 0.015,
-  LIMITE_DG: 3.5,
+  LIMITE_DG: 15,
 };
 
 const RIESGO_VIDA: Record<Sedentarismo, [number, number]> = { activo: [0.5, 0.7], moderado: [0.9, 1.1], severo: [1.4, 1.8] };
@@ -149,7 +149,7 @@ function CalculadoraPerfil() {
           <>
             <Resultado etiqueta={<>Sensibilidad inicial <V s="I0">S</V></>} valor={calculo.s0.toFixed(3)} nota="max(0.5, 1.8 − (IMC − 22) · 0.05)" />
             <Resultado etiqueta={<>Desgaste adiposo <V s="VAT">k</V></>} valor={calculo.k.toFixed(5)} nota="0.015 · factor · (1 + exceso de IMC · impacto)" />
-            <Resultado etiqueta="Resiliencia riesgo_vida" valor={`U(${bajo}, ${alto})`} nota="se sortea una vez por trayectoria" />
+            <Resultado etiqueta="Resiliencia riesgo_vida" valor={`U(${bajo}, ${alto})`} nota="se sortea al crear al paciente" />
           </>
         ) : (
           <p className="text-sm text-hud-tenue">Ingresa un IMC entre 12 y 70.</p>
@@ -234,7 +234,7 @@ export default function ComoFunciona() {
             <p>Cinco distribuciones de probabilidad alimentan al modelo; todas se generan con NumPy.</p>
             <div className="grid gap-3 sm:grid-cols-2">
               {[
-                ["weibull", "X_t · Envejecimiento y riesgo", "Weibull, κ = 2.5", "Se sortea W una vez por trayectoria: X_t = min(W · (t/T + edad/100) · riesgo_vida, 2)"],
+                ["weibull", "X_t · Envejecimiento y riesgo", "Weibull, κ = 2.5", "Se sortea W en cada paso: X_t = min(W · (t/T + edad/100) · riesgo_vida, 2)"],
                 ["normal", "E_cal_ruido · Fluctuación metabólica", "Normal, μ = 1, σ = 0.05", "Se sortea en cada paso; multiplica el desgaste de S_I"],
                 ["gamma", "T_β · Variabilidad de muerte celular", "Gamma, k = 2, θ = 0.5", "Se sortea en cada paso; multiplica la apoptosis de las células β"],
                 ["bernoulli", "P_gen · Factor genético", "Bernoulli, p = 0.35", "Si el antecedente es desconocido; si se informa, queda fijo"],
@@ -283,7 +283,7 @@ export default function ComoFunciona() {
               filas={[
                 ["Paso de integración", "1/5 de día"],
                 ["Registro de resultados", "cada trimestre (4 puntos por año)"],
-                ["Año", "365 días"],
+                ["Año", "12 meses de 30 días (360 días)"],
                 ["Horizonte", "1 a 20 años, a elección"],
                 ["Fracción de vida del envejecimiento", "paso / (95 − edad en pasos) + edad / 100"],
               ]}
@@ -365,7 +365,7 @@ export default function ComoFunciona() {
               <TriangleAlert size={20} className="mt-0.5 flex-shrink-0 text-amber-300" />
               <div className="space-y-2 text-sm">
                 <p><b className="text-amber-200">Es un pronóstico con incertidumbre, no un diagnóstico.</b> Sirve para conversar con el paciente sobre escenarios, no para decidir un tratamiento.</p>
-                <p>Las constantes vienen de Topp et al. y se ajustó la velocidad máxima de cambio de la glucemia para que, al diagnóstico, la pérdida de células β sea de 50–60 %, como reporta el UKPDS. Todavía no se validó con datos locales.</p>
+                <p>Las constantes son las de Topp et al. Al diagnóstico la pérdida de células β es de unos 33–36 %, menor que el 50–60 % del UKPDS: es un hallazgo de calibración que el informe documenta. Todavía no se validó con datos locales.</p>
                 <p>Todo paciente parte de glucosa 90 mg/dL e insulina 10 µU/mL: no se usan laboratorios propios del paciente.</p>
                 <p>Los escenarios suponen que el cambio de estilo de vida se cumple por completo desde su inicio.</p>
               </div>

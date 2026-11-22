@@ -6,9 +6,9 @@ import datetime as dt
 import jwt
 import pytest
 
-from tests.conftest import PACIENTE_BASE, cabeceras
+from pruebas.conftest import PACIENTE_BASE, cabeceras
 
-from app.config import settings
+from app.nucleo.configuracion import settings
 
 # ============================================================== autenticación
 def _login(cliente, correo, password):
@@ -90,8 +90,8 @@ def test_token_invalido_manipulado_o_vencido_se_rechaza(cliente, auth):
 
 
 def test_las_contrasenas_se_guardan_con_hash_bcrypt(cliente, auth):
-    from app.database import SessionLocal
-    from app.models import User
+    from app.nucleo.base_de_datos import SessionLocal
+    from app.modelos import User
 
     with SessionLocal() as db:
         for u in db.query(User).all():

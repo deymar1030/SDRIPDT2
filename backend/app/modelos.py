@@ -3,7 +3,7 @@ import datetime as dt
 from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from .database import Base
+from .nucleo.base_de_datos import Base
 
 
 class User(Base):

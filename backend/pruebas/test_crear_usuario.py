@@ -1,4 +1,4 @@
-"""Script de creación de usuarios (app.crear_usuario), probado como lo usa Docker: por línea de comandos."""
+"""Script de creación de usuarios (app.scripts.crear_usuario), probado como lo usa Docker: por línea de comandos."""
 
 import os
 import pathlib
@@ -13,7 +13,7 @@ BACKEND = pathlib.Path(__file__).resolve().parent.parent
 def _ejecutar(cliente, **entorno):
     env = {k: v for k, v in os.environ.items() if not k.startswith("INIT_USER_")}
     env.update(entorno)
-    return subprocess.run([sys.executable, "-m", "app.crear_usuario", "--desde-entorno"], cwd=BACKEND, env=env,
+    return subprocess.run([sys.executable, "-m", "app.scripts.crear_usuario", "--desde-entorno"], cwd=BACKEND, env=env,
                           capture_output=True, text=True, encoding="utf-8")
 
 
@@ -42,7 +42,7 @@ def test_es_idempotente_y_no_pisa_la_contrasena(cliente):
 
 def test_actualizar_password_si_se_pide(cliente):
     env = {k: v for k, v in os.environ.items() if not k.startswith("INIT_USER_")} | _usuario(INIT_USER_PASSWORD="nueva-clave")
-    r = subprocess.run([sys.executable, "-m", "app.crear_usuario", "--desde-entorno", "--actualizar-password"], cwd=BACKEND, env=env,
+    r = subprocess.run([sys.executable, "-m", "app.scripts.crear_usuario", "--desde-entorno", "--actualizar-password"], cwd=BACKEND, env=env,
                        capture_output=True, text=True, encoding="utf-8")
     assert r.returncode == 0 and "actualizada" in r.stdout
     assert cliente.post("/auth/login", data={"username": "admin.inicial@hospital.bo", "password": "nueva-clave"}).status_code == 200

@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .config import settings
-from .routers import auth, patients, usuarios
+from .nucleo.configuracion import settings
+from .api import autenticacion, pacientes, usuarios
 
 app = FastAPI(
     title="Simulador IR — API",
@@ -18,8 +18,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router)
-app.include_router(patients.router)
+app.include_router(autenticacion.router)
+app.include_router(pacientes.router)
 app.include_router(usuarios.router)
 
 

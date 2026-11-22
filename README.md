@@ -14,8 +14,8 @@ python -m venv .venv
 .venv\Scripts\activate          # PowerShell: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 copy .env.example .env           # y completa JWT_SECRET (ver abajo)
-alembic upgrade head             # crea las tablas
-python -m app.crear_usuario --correo tu@correo.bo --nombre "Tu Nombre" --rol admin
+alembic upgrade head             # aplica las migraciones (ver backend/migraciones/LEEME.md)
+python -m app.scripts.crear_usuario --correo tu@correo.bo --nombre "Tu Nombre" --rol admin
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -23,10 +23,10 @@ uvicorn app.main:app --reload --port 8000
 `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
 
 No hay usuarios ni pacientes predefinidos: la base empieza vacía. El primer
-usuario se crea con `app.crear_usuario`, que pide la contraseña sin
+usuario se crea con `app.scripts.crear_usuario`, que pide la contraseña sin
 mostrarla. Para despliegues sin interacción, define `INIT_USER_CORREO`,
 `INIT_USER_NOMBRE`, `INIT_USER_PASSWORD` (y opcionalmente `INIT_USER_ROL`) y
-ejecuta `python -m app.crear_usuario --desde-entorno`; si el usuario ya existe
+ejecuta `python -m app.scripts.crear_usuario --desde-entorno`; si el usuario ya existe
 no lo modifica. Con `--actualizar-password` se puede restablecer la
 contraseña de un usuario existente.
 
@@ -62,7 +62,7 @@ Para ver las cuatro personas del informe contra el simulador:
 
 ```
 cd backend
-python probar_motor.py
+python -m app.scripts.probar_motor
 ```
 
 ## Despliegue con Docker (Coolify)
@@ -90,7 +90,7 @@ En Coolify:
 
 Las demás cuentas las crea el admin desde la pantalla **Usuarios** de la propia
 app (no hay registro público). Como alternativa, desde la terminal del contenedor
-`backend`: `python -m app.crear_usuario --correo ... --nombre "..." --rol medico`.
+`backend`: `python -m app.scripts.crear_usuario --correo ... --nombre "..." --rol medico`.
 
 En desarrollo local se puede seguir usando SQLite (`DATABASE_URL` en
 `backend/.env`) o apuntar a un PostgreSQL con las variables `POSTGRES_*`.
@@ -136,9 +136,10 @@ En desarrollo local se puede seguir usando SQLite (`DATABASE_URL` en
 
 ## Qué falta
 
-- Validación del modelo con datos locales. Usa las constantes de Topp et al., con
-  la velocidad máxima de cambio de la glucemia ajustada para que el déficit de
-  células β al diagnóstico sea de 50–60 % (UKPDS). Los resultados son orientativos.
+- Calibración y validación del modelo con datos locales. Usa las constantes de
+  Topp et al.; al diagnóstico el déficit de células β es de ~33–36 %, menor que el
+  50–60 % del UKPDS (hallazgo de calibración documentado en el informe). Los
+  resultados son orientativos.
 - Todo paciente parte de glucosa 90 mg/dL e insulina 10 µU/mL: no se usan
   laboratorios propios del paciente.
 - Sexo, hipertensión y tabaquismo no intervienen en el modelo.
