@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { FlaskConical, TriangleAlert } from "lucide-react";
 import { PublicLayout } from "../components/PublicLayout";
 import { BotonEnlace, Campo, Entrada, Selector } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
@@ -48,18 +49,18 @@ function V({ children, s }: { children: ReactNode; s?: ReactNode }) {
 
 function Formula({ children, etiqueta }: { children: ReactNode; etiqueta?: string }) {
   return (
-    <div className="my-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 overflow-x-auto rounded-md border border-hud-borde bg-hud-panel px-4 py-3">
+    <div className="my-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 overflow-x-auto rounded-lg border border-hud-borde bg-hud-fondo/60 px-4 py-3">
       <div className="font-serif text-[15px] text-white">{children}</div>
-      {etiqueta && <span className="font-mono text-xs text-hud-tenue">{etiqueta}</span>}
+      {etiqueta && <span className="font-mono text-[11px] uppercase tracking-wider text-hud-tenue">{etiqueta}</span>}
     </div>
   );
 }
 
 function Seccion({ id, eyebrow, titulo, children }: { id: string; eyebrow: string; titulo: string; children: ReactNode }) {
   return (
-    <section id={id} className="scroll-mt-24 border-t border-hud-borde-fuerte pt-8">
-      <p className="text-sm text-hud-tenue">{eyebrow}</p>
-      <h2 className="mt-1 text-3xl text-white">{titulo}</h2>
+    <section id={id} className="scroll-mt-24 border-t border-hud-borde pt-10">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-300">{eyebrow}</p>
+      <h2 className="mt-1.5 text-2xl font-bold text-white">{titulo}</h2>
       <div className="mt-4 space-y-4 leading-relaxed text-hud-suave">{children}</div>
     </section>
   );
@@ -67,9 +68,9 @@ function Seccion({ id, eyebrow, titulo, children }: { id: string; eyebrow: strin
 
 function Tabla({ cabecera, filas }: { cabecera: string[]; filas: ReactNode[][] }) {
   return (
-    <div className="overflow-x-auto rounded-md border border-hud-borde bg-hud-panel">
+    <div className="overflow-x-auto rounded-xl border border-hud-borde">
       <table className="w-full text-sm">
-        <thead className="bg-hud-panel-2 text-left text-xs text-hud-tenue">
+        <thead className="bg-hud-panel-2/60 text-left text-[11px] uppercase tracking-wider text-hud-tenue">
           <tr>{cabecera.map((c) => <th key={c} className="px-4 py-2.5 font-medium">{c}</th>)}</tr>
         </thead>
         <tbody>
@@ -131,8 +132,8 @@ function CalculadoraPerfil() {
   const [bajo, alto] = RIESGO_VIDA[sedentarismo];
 
   return (
-    <div className="rounded-md border border-hud-borde bg-hud-panel p-5">
-      <p className="mb-3 font-serif text-lg font-semibold text-white">Pruébalo: del perfil al estado inicial</p>
+    <div className="rounded-xl border border-hud-borde-fuerte bg-hud-panel/60 p-5">
+      <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-300">Pruébalo: del perfil al estado inicial</p>
       <div className="grid gap-4 sm:grid-cols-2">
         <Campo etiqueta="IMC" htmlFor="calc-imc">
           <Entrada id="calc-imc" type="number" step="0.1" value={imc} onChange={(e) => setImc(e.target.value)} />
@@ -165,8 +166,8 @@ export default function ComoFunciona() {
     <PublicLayout>
       <section className="border-b border-hud-borde bg-hud-panel/40">
         <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:py-16">
-          <p className="text-sm text-hud-tenue">Metodología</p>
-          <h1 className="mt-2 max-w-3xl text-4xl leading-tight text-white sm:text-5xl">Cómo funciona la simulación</h1>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-300">Metodología</p>
+          <h1 className="mt-2 max-w-3xl text-3xl font-bold leading-tight text-white sm:text-4xl">Cómo funciona la simulación</h1>
           <p className="mt-4 max-w-3xl text-lg text-hud-suave">
             El pronóstico sale de un sistema de <b className="text-white">ecuaciones diferenciales</b> (modelo de Topp et al.) integrado con el
             método de <b className="text-white">Euler</b> y repetido con <b className="text-white">simulación Monte Carlo</b>: se generan
@@ -188,9 +189,9 @@ export default function ComoFunciona() {
 
         <article className="min-w-0 space-y-12 pb-10">
           <section id="resumen" className="scroll-mt-24">
-            <h2 className="text-3xl text-white">Visión general</h2>
+            <h2 className="text-2xl font-bold text-white">Visión general</h2>
             <p className="mt-3 text-hud-suave">Cada vez que presionas “Ejecutar simulación” ocurre lo siguiente, para cada escenario:</p>
-            <ol className="mt-6 grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-5">
+            <ol className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
               {[
                 ["Paciente virtual", "Edad, IMC, sedentarismo y antecedentes"],
                 ["Sorteo", "Weibull, Normal, Gamma, Bernoulli y Uniforme"],
@@ -198,8 +199,8 @@ export default function ComoFunciona() {
                 ["Parada", "Se detiene al llegar a 126 mg/dL"],
                 ["Resumen", "Percentiles, probabilidades y gráficas"],
               ].map(([t, d], i) => (
-                <li key={t} className="border-t border-hud-borde-fuerte pt-3">
-                  <span className="font-serif text-2xl font-semibold text-hud-borde-fuerte">{i + 1}</span>
+                <li key={t} className="relative rounded-xl border border-hud-borde bg-hud-panel/80 p-4 shadow-[var(--sombra-panel)]">
+                  <span className="font-mono text-xs text-hud-acento">0{i + 1}</span>
                   <p className="mt-1 font-semibold text-white">{t}</p>
                   <p className="text-xs text-hud-tenue">{d}</p>
                 </li>
@@ -239,7 +240,7 @@ export default function ComoFunciona() {
                 ["bernoulli", "P_gen · Factor genético", "Bernoulli, p = 0.35", "Si el antecedente es desconocido; si se informa, queda fijo"],
                 ["uniforme", "riesgo_vida y a_gen", "Uniforme por nivel", "activo U(0.5, 0.7) · moderado U(0.9, 1.1) · severo U(1.4, 1.8) · a_gen U(1.2, 1.6)"],
               ].map(([forma, titulo, dist, uso]) => (
-                <div key={titulo} className="flex gap-3 border-t border-hud-borde pt-3">
+                <div key={titulo} className="flex gap-3 rounded-xl border border-hud-borde bg-hud-panel/60 p-4">
                   <FormaDistribucion tipo={forma as "normal"} />
                   <div className="min-w-0">
                     <p className="font-semibold text-white">{titulo}</p>
@@ -360,7 +361,8 @@ export default function ComoFunciona() {
           </Seccion>
 
           <Seccion id="limitaciones" eyebrow="Importante" titulo="Alcances y límites">
-            <div className="border-l-4 border-amber-300 bg-amber-300/10 px-4 py-3 text-amber-100">
+            <div className="flex gap-3 rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-amber-100">
+              <TriangleAlert size={20} className="mt-0.5 flex-shrink-0 text-amber-300" />
               <div className="space-y-2 text-sm">
                 <p><b className="text-amber-200">Es un pronóstico con incertidumbre, no un diagnóstico.</b> Sirve para conversar con el paciente sobre escenarios, no para decidir un tratamiento.</p>
                 <p>Las constantes vienen de Topp et al. y se ajustó la velocidad máxima de cambio de la glucemia para que, al diagnóstico, la pérdida de células β sea de 50–60 %, como reporta el UKPDS. Todavía no se validó con datos locales.</p>
@@ -370,12 +372,12 @@ export default function ComoFunciona() {
             </div>
           </Seccion>
 
-          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-hud-borde-fuerte pt-8">
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-hud-borde-fuerte bg-hud-acento/10 p-6">
             <div>
-              <p className="font-serif text-xl font-semibold text-white">Ahora míralo en acción</p>
+              <p className="font-semibold text-white">Ahora míralo en acción</p>
               <p className="text-sm text-hud-suave">Registra a un paciente y compara sus escenarios en el simulador.</p>
             </div>
-            <BotonEnlace to={usuario?.rol === "medico" ? "/simulador" : usuario ? inicioPorRol(usuario) : "/login"}>
+            <BotonEnlace to={usuario?.rol === "medico" ? "/simulador" : usuario ? inicioPorRol(usuario) : "/login"} icono={<FlaskConical size={16} />}>
               {usuario?.rol === "medico" ? "Abrir el simulador" : usuario ? "Ir a usuarios" : "Ingresar para simular"}
             </BotonEnlace>
           </div>

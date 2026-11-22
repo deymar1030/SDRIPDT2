@@ -15,9 +15,9 @@ export const DETALLE_SEDENTARISMO: Record<Sedentarismo, string> = {
 };
 
 export const COLOR_SEDENTARISMO: Record<Sedentarismo, string> = {
-  activo: "#2f7d5b",
-  moderado: "#b7791f",
-  severo: "#b42318",
+  activo: "#3fb98a",
+  moderado: "#facc15",
+  severo: "#f43f5e",
 };
 
 export const NOMBRE_NIVEL: Record<NivelIntervencion, string> = {

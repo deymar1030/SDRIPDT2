@@ -1,101 +1,125 @@
 @import "tailwindcss";
 
-/* Sistema visual: documento clínico. Papel cálido, tinta oscura, un solo
-   acento azul petróleo y colores de estado apagados. Los tokens conservan
-   el prefijo hud-* para no tocar cada componente; el tema claro es el base
-   y el oscuro los redefine sobre [data-theme="dark"]. */
+/* Paleta única del sistema, tomada del panel metabólico (HUD):
+   azul noche de fondo, paneles algo más claros, acento cian.
+   Estos valores son el tema OSCURO (por defecto); el tema claro los
+   redefine más abajo sobre [data-theme="light"]. */
 @theme {
-  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Source Serif 4 Variable", Georgia, "Times New Roman", serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
-
-  --color-hud-fondo: #f4f3ef;
-  --color-hud-panel: #ffffff;
-  --color-hud-panel-2: #ecebe5;
-  --color-hud-borde: #d9d6cd;
-  --color-hud-borde-fuerte: #a9a598;
-  --color-hud-acento: #0b5d7a;
-  --color-hud-texto: #1d2127;
-  --color-hud-suave: #4a525b;
-  --color-hud-tenue: #6b727b;
+  --color-hud-fondo: #08161f;
+  --color-hud-panel: #0e212d;
+  --color-hud-panel-2: #142b3a;
+  --color-hud-borde: rgb(125 200 210 / 0.18);
+  --color-hud-borde-fuerte: rgb(125 200 210 / 0.4);
+  --color-hud-acento: #34b4c4;
+  --color-hud-texto: #e6f1f4;
+  --color-hud-suave: #93b2bd;
+  --color-hud-tenue: #628290;
 }
 
 :root {
-  --tinta-pct: 82%;
-  --sombra-panel: none;
-  --opacidad-cuerpo: 0.22;
-  --color-white: #14181d;
-  --color-sky-100: #14181d;
-  --color-sky-200: #2e3a44;
-  --color-sky-300: #0b5d7a;
-  --color-cyan-200: #0b5d7a;
-  --color-cyan-300: #0b5d7a;
-  --color-amber-100: #5c3a0b;
-  --color-amber-200: #7a4a0d;
-  --color-amber-300: #9a5f10;
-  --color-rose-200: #8a1f1a;
-  --color-rose-300: #a82b24;
-  --color-rose-400: #b42318;
-  --color-emerald-200: #1f5c43;
-  --color-emerald-400: #2f7d5b;
+  /* Cuánto del color de nivel (verde/amarillo/naranja/rojo) se conserva
+     al usarlo como TEXTO; el resto se mezcla con --color-white, que en
+     oscuro es blanco y en claro es azul marino → en claro oscurece. */
+  --tinta-pct: 100%;
+  --rejilla: rgb(125 200 210 / 0.02);
+  --fondo-brillo: #0f2a38;
+  --sombra-panel: 0 2px 10px rgb(0 0 0 / 0.18);
+  color-scheme: dark;
+}
+
+/* ---------------- Tema claro ----------------
+   Además de los tokens hud-*, se redefinen los pocos colores de Tailwind
+   que los componentes usan como texto claro sobre fondo oscuro (white,
+   sky/cyan/amber/rose/emerald claros): en claro pasan a tonos oscuros. */
+:root[data-theme="light"] {
+  --color-hud-fondo: #f2f7f9;
+  --color-hud-panel: #ffffff;
+  --color-hud-panel-2: #e3edf1;
+  --color-hud-borde: rgb(11 110 125 / 0.16);
+  --color-hud-borde-fuerte: rgb(11 110 125 / 0.4);
+  --color-hud-acento: #0b8497;
+  --color-hud-texto: #17303a;
+  --color-hud-suave: #46636e;
+  --color-hud-tenue: #6a8590;
+
+  --color-white: #0b2230;
+  --color-sky-100: #0c4a6e;
+  --color-sky-200: #075985;
+  --color-sky-300: #0369a1;
+  --color-cyan-200: #155e75;
+  --color-cyan-300: #0e7490;
+  --color-amber-100: #78350f;
+  --color-amber-200: #92400e;
+  --color-amber-300: #b45309;
+  --color-rose-200: #9f1239;
+  --color-rose-300: #be123c;
+  --color-rose-400: #e11d48;
+  --color-emerald-200: #065f46;
+  --color-emerald-400: #059669;
+
+  --tinta-pct: 62%;
+  --rejilla: rgb(11 110 125 / 0.04);
+  --fondo-brillo: #dcecf1;
+  --sombra-panel: 0 1px 6px rgb(15 50 60 / 0.07);
   color-scheme: light;
 }
 
-:root[data-theme="dark"] {
-  --color-hud-fondo: #0e1216;
-  --color-hud-panel: #151a20;
-  --color-hud-panel-2: #1c232a;
-  --color-hud-borde: #29313a;
-  --color-hud-borde-fuerte: #46525e;
-  --color-hud-acento: #7cc0da;
-  --color-hud-texto: #e6e9ed;
-  --color-hud-suave: #a3abb4;
-  --color-hud-tenue: #7b848e;
+/* Isla oscura: el panel metabólico, el héroe del panel principal y las
+   ilustraciones holográficas son "pantallas" y se ven oscuras en ambos
+   temas. Restablece todos los valores redefinidos arriba. */
+:root[data-theme="light"] .isla-oscura,
+.isla-oscura {
+  --color-hud-fondo: #08161f;
+  --color-hud-panel: #0e212d;
+  --color-hud-panel-2: #142b3a;
+  --color-hud-borde: rgb(125 200 210 / 0.18);
+  --color-hud-borde-fuerte: rgb(125 200 210 / 0.4);
+  --color-hud-acento: #34b4c4;
+  --color-hud-texto: #e6f1f4;
+  --color-hud-suave: #93b2bd;
+  --color-hud-tenue: #628290;
 
-  --tinta-pct: 62%;
-  --opacidad-cuerpo: 0.42;
-  --color-white: #f2f4f6;
-  --color-sky-100: #e6e9ed;
-  --color-sky-200: #c8d0d8;
-  --color-sky-300: #8fc3d8;
-  --color-cyan-200: #a9d3e3;
-  --color-cyan-300: #8fc3d8;
-  --color-amber-100: #f3e3bc;
-  --color-amber-200: #ecd08f;
-  --color-amber-300: #e2b865;
-  --color-rose-200: #f4c4c0;
-  --color-rose-300: #ee9a94;
-  --color-rose-400: #e5776f;
-  --color-emerald-200: #b5e0cb;
-  --color-emerald-400: #66b995;
+  --color-white: #fff;
+  --color-sky-100: #e0f2fe;
+  --color-sky-200: #bae6fd;
+  --color-sky-300: #7dd3fc;
+  --color-cyan-200: #a5f3fc;
+  --color-cyan-300: #67e8f9;
+  --color-amber-100: #fef3c7;
+  --color-amber-200: #fde68a;
+  --color-amber-300: #fcd34d;
+  --color-rose-200: #fecdd3;
+  --color-rose-300: #fda4af;
+  --color-rose-400: #fb7185;
+  --color-emerald-200: #a7f3d0;
+  --color-emerald-400: #3fb98a;
+
+  --tinta-pct: 100%;
+  --sombra-panel: 0 2px 10px rgb(0 0 0 / 0.18);
   color-scheme: dark;
+  color: var(--color-hud-texto);
 }
 
 html, body, #root { height: 100%; }
 body {
-  @apply bg-hud-fondo font-sans text-hud-texto antialiased;
-  font-size: 15px;
-  line-height: 1.55;
+  @apply text-hud-texto antialiased;
+  background:
+    linear-gradient(var(--rejilla) 1px, transparent 1px) 0 0 / 32px 32px,
+    linear-gradient(90deg, var(--rejilla) 1px, transparent 1px) 0 0 / 32px 32px,
+    radial-gradient(ellipse at 60% 0%, var(--fondo-brillo) 0%, var(--color-hud-fondo) 55%) fixed;
+  background-color: var(--color-hud-fondo);
   transition: background-color 0.2s ease;
-}
-
-h1, h2 {
-  font-family: var(--font-serif);
-  font-weight: 600;
-  letter-spacing: -0.012em;
 }
 
 html { scroll-behavior: smooth; }
 
-::selection { background: color-mix(in oklab, var(--color-hud-acento) 30%, transparent); }
+::selection { background: rgb(52 180 196 / 0.35); }
 
 input[type="range"] { accent-color: var(--color-hud-acento); }
 
-.cifras { font-variant-numeric: tabular-nums; }
-
 @keyframes escaneo { from { top: -10%; } to { top: 100%; } }
 @keyframes ecg { from { stroke-dashoffset: 260; } to { stroke-dashoffset: -260; } }
-@keyframes pulso-organo { 0% { transform: scale(0.6); opacity: 0.45; } 100% { transform: scale(1.9); opacity: 0; } }
+@keyframes pulso-organo { 0% { transform: scale(0.6); opacity: 0.55; } 100% { transform: scale(1.9); opacity: 0; } }
 @keyframes flotar { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 
 @media (prefers-reduced-motion: reduce) {
@@ -103,6 +127,6 @@ input[type="range"] { accent-color: var(--color-hud-acento); }
   * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
 }
 
-::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--color-hud-borde-fuerte); border-radius: 9999px; border: 2px solid var(--color-hud-fondo); }
+::-webkit-scrollbar-thumb { background: rgb(125 200 210 / 0.25); border-radius: 9999px; }
