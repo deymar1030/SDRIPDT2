@@ -58,7 +58,7 @@ class PasswordChange(BaseModel):
 # ---------------- Pacientes ----------------
 class PatientCreate(BaseModel):
     nombre: str = Field(min_length=1, max_length=160)
-    edad: int = Field(ge=18, le=100)
+    edad: int = Field(ge=18, le=95)
     peso: float = Field(ge=20, le=300)
     talla: float = Field(ge=100, le=230)
     sedentarismo: Sedentarismo

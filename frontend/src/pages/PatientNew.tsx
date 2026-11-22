@@ -80,8 +80,8 @@ export default function PatientNew() {
             <Campo etiqueta="Nombre" htmlFor="nombre" className="sm:col-span-3">
               <Entrada id="nombre" required value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Ana Villarroel" />
             </Campo>
-            <Campo etiqueta="Edad (años)" htmlFor="edad" ayuda="Persona adulta: 18 a 100">
-              <Entrada id="edad" required type="number" min={18} max={100} value={edad} onChange={(e) => setEdad(e.target.value)} />
+            <Campo etiqueta="Edad (años)" htmlFor="edad" ayuda="Persona adulta: 18 a 95">
+              <Entrada id="edad" required type="number" min={18} max={95} value={edad} onChange={(e) => setEdad(e.target.value)} />
             </Campo>
             <Campo etiqueta="Peso (kg)" htmlFor="peso" ayuda="20 a 300 kg">
               <Entrada id="peso" required type="number" step="0.1" min={20} max={300} value={peso} onChange={(e) => setPeso(e.target.value)} />

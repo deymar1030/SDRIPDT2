@@ -107,7 +107,7 @@ def test_paciente_se_registra_con_las_entradas_del_informe(crear_paciente):
 
 
 @pytest.mark.parametrize("campo, valor", [
-    ("edad", 17), ("edad", 101), ("peso", 19), ("peso", 301), ("talla", 99), ("talla", 231), ("sedentarismo", "extremo"), ("antecedente_familiar", None), ("nombre", ""),
+    ("edad", 17), ("edad", 96), ("peso", 19), ("peso", 301), ("talla", 99), ("talla", 231), ("sedentarismo", "extremo"), ("antecedente_familiar", None), ("nombre", ""),
 ])
 def test_paciente_rechaza_valores_invalidos(cliente, auth, campo, valor):
     r = cliente.post("/pacientes", json={**PACIENTE_BASE, campo: valor}, headers=auth)
@@ -123,7 +123,7 @@ def test_paciente_exige_las_entradas_del_informe(cliente, auth, campo):
 
 def test_paciente_acepta_los_extremos_validos(crear_paciente):
     assert crear_paciente(edad=18, imc=12)["id"]
-    assert crear_paciente(edad=100, imc=70)["id"]
+    assert crear_paciente(edad=95, imc=70)["id"]
 
 
 def test_el_imc_se_calcula_con_peso_y_talla(crear_paciente):
