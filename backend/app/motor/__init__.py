@@ -67,7 +67,7 @@ def calcular_supuestos(edad: int, imc: float, sedentarismo: str, antecedente_fam
     return {
         "variablesAleatorias": [
             {"simbolo": "X_t", "nombre": "Envejecimiento y riesgo", "distribucion": "Weibull",
-             "parametros": f"κ = {p.WEIBULL_KAPPA}, tope {p.X_T_MAXIMO}"},
+             "parametros": f"κ = {p.WEIBULL_KAPPA}, una vez por trayectoria, tope {p.X_T_MAXIMO}"},
             {"simbolo": "E_cal_ruido", "nombre": "Fluctuación metabólica diaria", "distribucion": "Normal",
              "parametros": f"μ = {p.RUIDO_METABOLICO_MU}, σ = {p.RUIDO_METABOLICO_SIGMA}"},
             {"simbolo": "T_β", "nombre": "Variabilidad de muerte celular", "distribucion": "Gamma",

@@ -8,7 +8,7 @@ const CLAVE = "simulador-ir:tema";
 function temaInicial(): Tema {
   // index.html ya aplicó el tema antes de pintar; aquí solo se lee.
   const actual = document.documentElement.dataset.theme;
-  return actual === "light" ? "light" : "dark";
+  return actual === "dark" ? "dark" : "light";
 }
 
 interface TemaCtx {

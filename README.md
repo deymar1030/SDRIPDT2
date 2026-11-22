@@ -136,9 +136,9 @@ En desarrollo local se puede seguir usando SQLite (`DATABASE_URL` en
 
 ## Qué falta
 
-- Calibración y validación del modelo. Usa las constantes teóricas de Topp et al.;
-  al diagnóstico el déficit de células β es de ~33 %, menor que el 50–60 % del
-  UKPDS. Los resultados son orientativos.
+- Validación del modelo con datos locales. Usa las constantes de Topp et al., con
+  la velocidad máxima de cambio de la glucemia ajustada para que el déficit de
+  células β al diagnóstico sea de 50–60 % (UKPDS). Los resultados son orientativos.
 - Todo paciente parte de glucosa 90 mg/dL e insulina 10 µU/mL: no se usan
   laboratorios propios del paciente.
 - Sexo, hipertensión y tabaquismo no intervienen en el modelo.

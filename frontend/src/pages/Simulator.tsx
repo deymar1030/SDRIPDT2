@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Plus, Trash2, History, X, Play, Pause, FlaskConical, ChevronDown, Pencil, Activity, Scale, CalendarRange } from "lucide-react";
+import { Pause, Pencil, Play, Trash2, X } from "lucide-react";
 import { ModalEscenario } from "../components/ModalEscenario";
 import { NOMBRE_NIVEL, resumenEscenario, textoAntecedente } from "../lib/perfil";
 import { Shell } from "../components/Shell";
 import { StageBadge } from "../components/StageBadge";
 import { SedentarismoBadge } from "../components/SedentarismoBadge";
 import { SegmentedBar } from "../components/SegmentedBar";
-import { TrajectoryChart, PALETA_ESCENARIOS } from "../components/TrajectoryChart";
+import { TrajectoryChart } from "../components/TrajectoryChart";
+import { usePaleta } from "../components/temaGraficas";
 import {
   BarrasTiempoLibre,
   GraficaIncidencia,
@@ -17,7 +18,7 @@ import {
   type ModoPanel,
 } from "../components/GraficasInforme";
 import { PanelAnatomico, estadoDesdeAnio, estadoDesdePaciente } from "../components/PanelAnatomico";
-import { Aviso, Avatar, Boton, Campo, Panel, Selector, claseTabla, tinta } from "../components/ui";
+import { Aviso, Boton, Campo, Muestra, Panel, Pestanas, Segmentado, Selector, claseTabla } from "../components/ui";
 import { api } from "../api/client";
 import type { DatosEscenario, Escenario, Paciente, PuntoSerie, ResultadoEscenario, SimulateResponse, SimulationRunSummary } from "../types";
 
@@ -29,36 +30,24 @@ const MARCADORES = [
   { clave: "glucosa" as const, etiqueta: "Glucosa", unidad: "mg/dL" },
   { clave: "insulina" as const, etiqueta: "Insulina", unidad: "µU/mL" },
   { clave: "homaIR" as const, etiqueta: "HOMA-IR", unidad: "" },
-  { clave: "homaBeta" as const, etiqueta: "HOMA-β", unidad: "% función" },
+  { clave: "homaBeta" as const, etiqueta: "HOMA-β", unidad: "% de función" },
   { clave: "deficitBeta" as const, etiqueta: "Déficit beta", unidad: "%" },
   { clave: "sensibilidad" as const, etiqueta: "Sensibilidad S_I", unidad: "S_I" },
 ];
-
-function Pestana({ activa, onClick, children }: { activa: boolean; onClick: () => void; children: ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
-        activa ? "border-hud-acento bg-hud-acento/15 text-white" : "border-hud-borde text-hud-suave hover:text-white"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
 
 function puntosAnuales(r: ResultadoEscenario): PuntoSerie[] {
   return r.serie.filter((p) => Math.abs(p.anio - Math.round(p.anio)) < 1e-6);
 }
 
 function textoTiempo(r: ResultadoEscenario, horizonte: number) {
-  if (r.sinDiabetesEnHorizonte) return `> ${horizonte} años`;
+  if (r.sinDiabetesEnHorizonte) return `más de ${horizonte} años`;
   return `${r.tiempoMedianoDiagnostico?.toFixed(1)} años`;
 }
 
 export default function Simulator() {
   const [params, setParams] = useSearchParams();
   const pacienteId = params.get("id");
+  const paleta = usePaleta();
 
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [pacientesTodos, setPacientesTodos] = useState<Paciente[]>([]);
@@ -167,112 +156,85 @@ export default function Simulator() {
   }
 
   const resultadoVista = resultados?.resultados[Math.min(escenarioVista, resultados.resultados.length - 1)];
-  const colorVista = PALETA_ESCENARIOS[escenarioVista % PALETA_ESCENARIOS.length];
+  const colorVista = paleta[escenarioVista % paleta.length];
+  const pestanasEscenario = resultados?.resultados.map((r, i) => ({ clave: i, etiqueta: r.nombre })) ?? [];
 
   return (
-    <Shell titulo="Simulador de pronóstico" subtitulo="Monte Carlo · modelo de Topp et al. en pasos de 1/5 de día">
+    <Shell titulo="Simulador de pronóstico" subtitulo="Cada escenario se repite cientos de veces con azar distinto; el resultado es una probabilidad, no una única respuesta.">
       {errorPaciente && (
         <div className="mb-5">
           <Aviso tipo="error">{errorPaciente}. Elige otro paciente de la lista.</Aviso>
         </div>
       )}
 
-      <Panel className="mb-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            {paciente && <Avatar nombre={paciente.nombre} tamano={40} />}
-            <div className="relative">
-              <select
-                value={pacienteId ?? ""}
-                onChange={(e) => setParams({ id: e.target.value })}
-                aria-label="Paciente"
-                className="appearance-none rounded-lg border border-hud-borde bg-hud-fondo/60 py-2 pl-3 pr-9 text-base font-semibold text-white focus:border-hud-acento focus:outline-none"
-              >
-                {pacientesTodos.map((p) => (
-                  <option key={p.id} value={p.id}>{p.nombre}</option>
-                ))}
-              </select>
-              <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-hud-suave" />
-            </div>
-          </div>
-          {paciente && (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-sm text-hud-suave">
-              <span>{paciente.edad} años</span>
-              <span>IMC <b className="text-white">{paciente.imc}</b></span>
-              <SedentarismoBadge nivel={paciente.sedentarismo} />
-              <span className="font-sans text-xs">{textoAntecedente(paciente.antecedente_familiar)}</span>
-            </div>
-          )}
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-x-8 gap-y-3 border-y border-hud-borde-fuerte py-3">
+        <div className="flex items-center gap-3">
+          <label htmlFor="paciente" className="text-sm text-hud-tenue">Paciente</label>
+          <Selector id="paciente" value={pacienteId ?? ""} onChange={(e) => setParams({ id: e.target.value })} className="!w-auto min-w-52 font-medium">
+            {pacientesTodos.map((p) => (
+              <option key={p.id} value={p.id}>{p.nombre}</option>
+            ))}
+          </Selector>
         </div>
-      </Panel>
+        {paciente && (
+          <div className="cifras flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-hud-suave">
+            <span>{paciente.edad} años</span>
+            <span>IMC {paciente.imc}</span>
+            <SedentarismoBadge nivel={paciente.sedentarismo} />
+            <span>{textoAntecedente(paciente.antecedente_familiar)}</span>
+          </div>
+        )}
+      </div>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[300px_1fr]">
-        <aside className="space-y-5">
-          <Panel titulo="Escenarios a comparar" descripcion="Hasta 4. Cada uno es un “¿y si…?” sobre el estilo de vida del paciente.">
-            <div className="space-y-2">
-              {escenarios.map((esc, i) => {
-                const color = PALETA_ESCENARIOS[i % PALETA_ESCENARIOS.length];
-                return (
-                  <div key={esc.id} className="group rounded-lg border border-hud-borde bg-hud-fondo/40 px-3 py-2.5">
-                    <div className="flex items-start gap-3">
-                      <span className="mt-1.5 h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}` }} />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-white">{esc.nombre}</p>
-                        <p className="text-[11px] text-hud-tenue">{NOMBRE_NIVEL[esc.nivel_intervencion]}</p>
-                      </div>
-                      <div className="flex gap-1 opacity-70 transition group-hover:opacity-100">
-                        <button onClick={() => setModal({ abierto: true, escenario: esc })} aria-label={`Editar ${esc.nombre}`} className="rounded p-1 text-hud-tenue hover:text-hud-acento">
-                          <Pencil size={14} />
-                        </button>
-                        <button onClick={() => quitarEscenario(esc.id)} aria-label={`Quitar ${esc.nombre}`} className="rounded p-1 text-hud-tenue hover:text-rose-400">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                    {paciente && (
-                      <p className="mt-2 flex items-center gap-1.5 pl-5 text-[11px] text-hud-suave">
-                        {esc.nivel_intervencion === "nula" ? <Activity size={12} className="flex-shrink-0 text-hud-tenue" /> : esc.parametros?.inicio_anio ? <CalendarRange size={12} className="flex-shrink-0 text-hud-tenue" /> : <Scale size={12} className="flex-shrink-0 text-hud-tenue" />}
-                        {resumenEscenario(esc, paciente.sedentarismo)}
-                      </p>
-                    )}
+      <div className="grid grid-cols-1 gap-x-10 gap-y-10 lg:grid-cols-[290px_1fr]">
+        <aside className="space-y-8 lg:sticky lg:top-20 lg:self-start">
+          <Panel titulo="Escenarios" descripcion="Hasta 4. Cada uno es un “¿y si…?” sobre el estilo de vida.">
+            <ul className="border-t border-hud-borde">
+              {escenarios.map((esc, i) => (
+                <li key={esc.id} className="group flex items-start gap-3 border-b border-hud-borde py-3">
+                  <Muestra color={paleta[i % paleta.length]} className="mt-1.5" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-white">{esc.nombre}</p>
+                    <p className="text-xs text-hud-tenue">{NOMBRE_NIVEL[esc.nivel_intervencion]}</p>
+                    {paciente && <p className="mt-0.5 text-xs text-hud-suave">{resumenEscenario(esc, paciente.sedentarismo)}</p>}
                   </div>
-                );
-              })}
-            </div>
-
+                  <div className="flex gap-1 text-hud-tenue">
+                    <button onClick={() => setModal({ abierto: true, escenario: esc })} aria-label={`Editar ${esc.nombre}`} className="rounded p-1 hover:text-hud-acento">
+                      <Pencil size={14} />
+                    </button>
+                    <button onClick={() => quitarEscenario(esc.id)} aria-label={`Quitar ${esc.nombre}`} className="rounded p-1 hover:text-rose-400">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
             <button
               onClick={() => setModal({ abierto: true, escenario: null })}
               disabled={escenarios.length >= 4 || !paciente}
-              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-hud-borde-fuerte px-3 py-2 text-sm font-medium text-hud-suave transition-colors hover:border-hud-acento hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+              className="mt-3 text-sm font-medium text-hud-acento hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:no-underline"
             >
-              <Plus size={15} /> Agregar escenario
+              + Agregar escenario
             </button>
           </Panel>
 
           {paciente && (
-            <ModalEscenario
-              abierto={modal.abierto}
-              escenario={modal.escenario}
-              paciente={paciente}
-              horizonte={horizonte}
-              onCerrar={cerrarModal}
-              onGuardar={guardarEscenario}
-            />
+            <ModalEscenario abierto={modal.abierto} escenario={modal.escenario} paciente={paciente} horizonte={horizonte} onCerrar={cerrarModal} onGuardar={guardarEscenario} />
           )}
 
-          <Panel titulo="Parámetros de la corrida">
+          <Panel titulo="Corrida">
             <div className="space-y-4">
-              <Campo etiqueta={`Años a proyectar · ${horizonte}`} htmlFor="horizonte">
+              <Campo etiqueta={`Años a proyectar: ${horizonte}`} htmlFor="horizonte">
                 <input id="horizonte" type="range" min={1} max={20} value={horizonte} onChange={(e) => setHorizonte(+e.target.value)} className="w-full" />
               </Campo>
-              <Campo etiqueta="Trayectorias simuladas" htmlFor="trayectorias" ayuda="Más trayectorias = bandas más estables, pero tarda más.">
+              <Campo etiqueta="Trayectorias por escenario" htmlFor="trayectorias" ayuda="Más trayectorias dan bandas más estables, pero tardan más.">
                 <Selector id="trayectorias" value={trayectorias} onChange={(e) => setTrayectorias(+e.target.value)}>
                   <option value={100}>100</option>
                   <option value={200}>200</option>
                   <option value={500}>500</option>
                 </Selector>
               </Campo>
-              <Boton onClick={ejecutar} cargando={cargando} disabled={escenarios.length === 0} icono={<FlaskConical size={16} />} className="w-full">
+              <Boton onClick={ejecutar} cargando={cargando} disabled={escenarios.length === 0} className="w-full">
                 {cargando ? "Simulando…" : "Ejecutar simulación"}
               </Boton>
               {escenarios.length === 0 && <p className="text-xs text-hud-tenue">Agrega al menos un escenario para simular.</p>}
@@ -282,31 +244,24 @@ export default function Simulator() {
 
           {historial.length > 0 && (
             <Panel titulo="Historial" descripcion={resultados ? "Compara la simulación actual con una anterior." : "Ejecuta una simulación para poder comparar."}>
-              <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+              <ul className="max-h-64 overflow-y-auto border-t border-hud-borde">
                 {historial.map((h) => (
-                  <div key={h.id} className="flex items-center gap-2 rounded-lg border border-hud-borde bg-hud-fondo/40 px-2.5 py-2">
-                    <History size={14} className="flex-shrink-0 text-hud-acento" />
+                  <li key={h.id} className="flex items-center gap-3 border-b border-hud-borde py-2.5">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-medium text-white">{formatearFecha(h.creado_en)}</p>
-                      <p className="truncate text-[11px] text-hud-tenue">{h.horizonte_anios} años · {h.nombresEscenarios.join(", ")}</p>
+                      <p className="cifras truncate text-sm text-white">{formatearFecha(h.creado_en)}</p>
+                      <p className="truncate text-xs text-hud-tenue">{h.horizonte_anios} años · {h.nombresEscenarios.join(", ")}</p>
                     </div>
-                    <Boton
-                      variante="secundario"
-                      tamano="sm"
-                      onClick={() => compararCon(h.id)}
-                      cargando={cargandoComparacion === h.id}
-                      disabled={!resultados || resultados.runId === h.id}
-                    >
+                    <Boton variante="secundario" tamano="sm" onClick={() => compararCon(h.id)} cargando={cargandoComparacion === h.id} disabled={!resultados || resultados.runId === h.id}>
                       Comparar
                     </Boton>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </Panel>
           )}
         </aside>
 
-        <div className="min-w-0 space-y-5">
+        <div className="min-w-0 space-y-12">
           {paciente && (() => {
             const anuales = resultadoVista ? puntosAnuales(resultadoVista) : [];
             const punto = anuales[Math.min(anioVista, anuales.length - 1)];
@@ -318,13 +273,7 @@ export default function Simulator() {
               <PanelAnatomico estado={estado} momento={momento} escaneando={cargando}>
                 {resultados ? (
                   <div className="space-y-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {resultados.resultados.map((r, i) => (
-                        <Pestana key={r.escenarioId} activa={i === escenarioVista} onClick={() => { setEscenarioVista(i); setAnioVista(0); setReproduciendo(true); }}>
-                          {r.nombre}
-                        </Pestana>
-                      ))}
-                    </div>
+                    <Pestanas opciones={pestanasEscenario} activa={escenarioVista} onCambio={(i) => { setEscenarioVista(i); setAnioVista(0); setReproduciendo(true); }} etiqueta="Escenario mostrado" />
                     <div className="flex items-center gap-3">
                       <button
                         onClick={() => {
@@ -332,30 +281,18 @@ export default function Simulator() {
                           setReproduciendo((v) => !v);
                         }}
                         aria-label={reproduciendo ? "Pausar" : "Reproducir"}
-                        className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-hud-acento text-slate-950 shadow-[0_0_14px_rgb(34_211_238/0.5)] hover:bg-cyan-300"
+                        className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-hud-borde-fuerte text-hud-texto hover:bg-hud-panel-2"
                       >
-                        {reproduciendo ? <Pause size={15} /> : <Play size={15} className="ml-0.5" />}
+                        {reproduciendo ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
                       </button>
-                      <input
-                        type="range"
-                        min={0}
-                        max={ultimoAnio}
-                        value={anioVista}
-                        onChange={(e) => { setReproduciendo(false); setAnioVista(+e.target.value); }}
-                        className="flex-1"
-                        aria-label="Año de la proyección"
-                      />
-                      <span className="w-20 text-right font-mono text-xs text-sky-200">Año {anioVista} / {ultimoAnio}</span>
+                      <input type="range" min={0} max={ultimoAnio} value={anioVista} onChange={(e) => { setReproduciendo(false); setAnioVista(+e.target.value); }} className="flex-1" aria-label="Año de la proyección" />
+                      <span className="cifras w-20 text-right text-sm text-hud-suave">Año {anioVista} / {ultimoAnio}</span>
                     </div>
                     {punto && <SegmentedBar pct={punto.etapaPct} />}
-                    <p className="text-[11px] text-sky-200/50">
-                      Valores medianos de las trayectorias simuladas en ese año; la barra muestra cómo se reparten entre etapas.
-                    </p>
+                    <p className="text-xs text-hud-tenue">Valores medianos de las trayectorias en ese año; la barra muestra cómo se reparten entre etapas.</p>
                   </div>
                 ) : (
-                  <p className="text-xs text-sky-200/60">
-                    Estado inicial del modelo. Define los escenarios y presiona "Ejecutar simulación" para ver cómo evolucionaría año a año.
-                  </p>
+                  <p className="text-sm text-hud-suave">Estado inicial del modelo. Define los escenarios y ejecuta la simulación para ver cómo evolucionaría año a año.</p>
                 )}
               </PanelAnatomico>
             );
@@ -363,48 +300,49 @@ export default function Simulator() {
 
           {resultados && resultadoVista && (
             <>
-              <Panel titulo="Comparación entre escenarios">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  {resultados.resultados.map((r, i) => {
-                    const color = PALETA_ESCENARIOS[i % PALETA_ESCENARIOS.length];
-                    return (
-                      <div key={r.escenarioId} className="relative overflow-hidden rounded-xl border bg-hud-fondo/40 p-4" style={{ borderColor: `${color}55` }}>
-                        <span className="absolute inset-x-0 top-0 h-0.5" style={{ backgroundColor: color, boxShadow: `0 0 10px ${color}` }} />
-                        <p className="truncate text-xs font-medium text-hud-suave">{r.nombre}</p>
-                        <p className="mt-1 font-mono text-3xl font-bold" style={{ color: tinta(color), textShadow: `0 0 16px ${color}66` }}>{r.prob5}%</p>
-                        <p className="text-[11px] text-hud-tenue">prob. de diabetes a {Math.min(5, resultados.horizonteAnios)} años</p>
-                        <p className="mt-2 text-sm text-hud-texto">
-                          <span className="font-mono font-semibold">{r.probHorizonte}%</span> a {resultados.horizonteAnios} años
-                        </p>
-                        <p className="mt-1 text-xs text-hud-suave">
-                          Diagnóstico mediano: <b className="font-mono text-white">{textoTiempo(r, resultados.horizonteAnios)}</b>
-                          {r.edadMedianaDiagnostico != null && <span> (a los {r.edadMedianaDiagnostico.toFixed(0)} años)</span>}
-                        </p>
-                        <StageBadge etapa={r.etapaMediana} className="mt-2" />
-                      </div>
-                    );
-                  })}
+              <Panel titulo="Resultados por escenario" descripcion={`${resultados.trayectorias} trayectorias por escenario, horizonte de ${resultados.horizonteAnios} años.`}>
+                <div className="overflow-x-auto">
+                  <table className={claseTabla.tabla}>
+                    <thead>
+                      <tr className={claseTabla.encabezado}>
+                        <th className={claseTabla.celdaEncabezado}>Escenario</th>
+                        <th className={`${claseTabla.celdaEncabezado} text-right`}>Prob. a {Math.min(5, resultados.horizonteAnios)} años</th>
+                        <th className={`${claseTabla.celdaEncabezado} text-right`}>Prob. a {resultados.horizonteAnios} años</th>
+                        <th className={claseTabla.celdaEncabezado}>Diagnóstico mediano</th>
+                        <th className={claseTabla.celdaEncabezado}>Etapa al final</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {resultados.resultados.map((r, i) => (
+                        <tr key={r.escenarioId} className={claseTabla.fila}>
+                          <td className={claseTabla.celda}>
+                            <span className="flex items-center gap-2 font-medium text-white"><Muestra color={paleta[i % paleta.length]} />{r.nombre}</span>
+                          </td>
+                          <td className={`${claseTabla.celda} cifras text-right font-serif text-xl font-semibold text-white`}>{r.prob5} %</td>
+                          <td className={`${claseTabla.celda} cifras text-right text-hud-texto`}>{r.probHorizonte} %</td>
+                          <td className={`${claseTabla.celda} cifras text-hud-texto`}>
+                            {textoTiempo(r, resultados.horizonteAnios)}
+                            {r.edadMedianaDiagnostico != null && <span className="text-hud-tenue"> · a los {r.edadMedianaDiagnostico.toFixed(0)} años</span>}
+                          </td>
+                          <td className={claseTabla.celda}><StageBadge etapa={r.etapaMediana} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              </Panel>
 
-              {comparacion && (
-                <Panel
-                  esquinas
-                  titulo={`Comparando con la simulación del ${formatearFecha(comparacion.creadoEn)}`}
-                  acciones={
-                    <button onClick={() => setComparacion(null)} aria-label="Cerrar comparación" className="text-hud-suave hover:text-white">
-                      <X size={16} />
-                    </button>
-                  }
-                >
-                  <div className="overflow-x-auto">
+                {comparacion && (
+                  <div className="mt-6 border-t border-hud-borde pt-4">
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-sm font-medium text-white">Frente a la simulación del {formatearFecha(comparacion.creadoEn)}</p>
+                      <button onClick={() => setComparacion(null)} aria-label="Cerrar comparación" className="text-hud-tenue hover:text-white"><X size={16} /></button>
+                    </div>
                     <table className={claseTabla.tabla}>
                       <thead>
                         <tr className={claseTabla.encabezado}>
                           <th className={claseTabla.celdaEncabezado}>Escenario</th>
-                          <th className={claseTabla.celdaEncabezado}>Prob. 5 años</th>
-                          <th className={claseTabla.celdaEncabezado}>Prob. horizonte</th>
-                          <th className={claseTabla.celdaEncabezado}>Etapa esperada</th>
+                          <th className={claseTabla.celdaEncabezado}>Prob. a 5 años</th>
+                          <th className={claseTabla.celdaEncabezado}>Prob. al horizonte</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -414,154 +352,128 @@ export default function Simulator() {
                           const delta = actual.prob5 - antes.prob5;
                           return (
                             <tr key={actual.escenarioId} className={claseTabla.fila}>
-                              <td className={`${claseTabla.celda} font-medium text-white`}>{actual.nombre}</td>
-                              <td className={`${claseTabla.celda} font-mono`}>
-                                <span className="text-hud-tenue">{antes.prob5}%</span> → <b className="text-white">{actual.prob5}%</b>{" "}
-                                <span className={delta > 0 ? "text-rose-400" : delta < 0 ? "text-emerald-400" : "text-hud-tenue"}>
-                                  ({delta > 0 ? "+" : ""}{delta.toFixed(0)})
-                                </span>
+                              <td className={`${claseTabla.celda} text-white`}>{actual.nombre}</td>
+                              <td className={`${claseTabla.celda} cifras`}>
+                                <span className="text-hud-tenue">{antes.prob5} %</span> → <b className="text-white">{actual.prob5} %</b>{" "}
+                                <span className={delta > 0 ? "text-rose-400" : delta < 0 ? "text-emerald-400" : "text-hud-tenue"}>({delta > 0 ? "+" : ""}{delta.toFixed(0)})</span>
                               </td>
-                              <td className={`${claseTabla.celda} font-mono text-hud-texto`}>{antes.probHorizonte}% → {actual.probHorizonte}%</td>
-                              <td className={claseTabla.celda}>
-                                <div className="flex flex-wrap items-center gap-1.5 text-hud-tenue">
-                                  <StageBadge etapa={antes.etapaMediana} /> → <StageBadge etapa={actual.etapaMediana} />
-                                </div>
-                              </td>
+                              <td className={`${claseTabla.celda} cifras text-hud-texto`}>{antes.probHorizonte} % → {actual.probHorizonte} %</td>
                             </tr>
                           );
                         })}
                       </tbody>
                     </table>
                   </div>
-                </Panel>
-              )}
+                )}
+              </Panel>
 
               <Panel
-                titulo={`Perfil metabólico · ${resultadoVista.nombre}`}
-                descripcion="Las cuatro gráficas del informe: glucemia, secreción de insulina, pérdida de células beta y sensibilidad."
-                acciones={
-                  <div className="flex flex-wrap gap-2">
-                    {resultados.resultados.length > 1 && resultados.resultados.map((r, i) => (
-                      <Pestana key={r.escenarioId} activa={i === escenarioVista} onClick={() => setEscenarioVista(i)}>{r.nombre}</Pestana>
-                    ))}
-                    <Pestana activa={modoPanel === "individual"} onClick={() => setModoPanel("individual")}>Una trayectoria</Pestana>
-                    <Pestana activa={modoPanel === "mediana"} onClick={() => setModoPanel("mediana")}>Mediana y banda</Pestana>
-                  </div>
-                }
+                titulo="Figura 1 · Perfil metabólico"
+                descripcion={`Escenario «${resultadoVista.nombre}». Las cuatro gráficas del informe: glucemia, secreción de insulina, pérdida de células β y sensibilidad.`}
+                acciones={<Segmentado etiqueta="Qué mostrar" opciones={[{ clave: "individual" as const, etiqueta: "Una trayectoria" }, { clave: "mediana" as const, etiqueta: "Mediana y banda" }]} activa={modoPanel} onCambio={setModoPanel} />}
               >
+                {resultados.resultados.length > 1 && (
+                  <div className="mb-5">
+                    <Pestanas opciones={pestanasEscenario} activa={escenarioVista} onCambio={setEscenarioVista} etiqueta="Escenario de la figura" />
+                  </div>
+                )}
                 <PanelCuatroGraficas resultado={resultadoVista} modo={modoPanel} color={colorVista} />
-                <p className="mt-3 text-xs text-hud-tenue">
+                <p className="mt-4 text-xs text-hud-tenue">
                   {modoPanel === "individual"
-                    ? "Trayectoria representativa: la simulación cuyo diagnóstico está más cerca de la mediana, como el gráfico individual del informe."
-                    : "Línea: mediana de las trayectorias; sombra: percentiles 10 a 90."}
+                    ? "Trayectoria representativa: la simulación cuyo diagnóstico está más cerca de la mediana."
+                    : "Línea: mediana de las trayectorias. Sombra: percentiles 10 a 90."}
                 </p>
               </Panel>
 
-              <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-                <Panel titulo="Tiempo libre de diabetes" descripcion="Años hasta el diagnóstico mediano de cada escenario.">
+              <div className="grid grid-cols-1 gap-x-10 gap-y-12 xl:grid-cols-2">
+                <Panel titulo="Figura 2 · Tiempo libre de diabetes" descripcion="Años hasta el diagnóstico mediano de cada escenario.">
                   <BarrasTiempoLibre resultados={resultados.resultados} horizonte={resultados.horizonteAnios} />
                 </Panel>
-                <Panel titulo="Incidencia acumulada" descripcion="Porcentaje de trayectorias que llegaron a 126 mg/dL con el paso del tiempo.">
+                <Panel titulo="Figura 3 · Incidencia acumulada" descripcion="Porcentaje de trayectorias que llegaron a 126 mg/dL.">
                   <GraficaIncidencia resultados={resultados.resultados} horizonte={resultados.horizonteAnios} />
                 </Panel>
               </div>
 
-              <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-                <Panel titulo="Antes del diagnóstico" descripcion={`Glucemia de las trayectorias diagnosticadas, alineadas al momento del diagnóstico · ${resultadoVista.nombre}.`}>
+              <div className="grid grid-cols-1 gap-x-10 gap-y-12 xl:grid-cols-2">
+                <Panel titulo="Figura 4 · Antes del diagnóstico" descripcion={`Trayectorias diagnosticadas, alineadas al momento del diagnóstico. Escenario «${resultadoVista.nombre}».`}>
                   {resultadoVista.preDiagnostico.length > 0 ? (
                     <GraficaPreDiagnostico resultado={resultadoVista} color={colorVista} />
                   ) : (
-                    <p className="py-10 text-center text-sm text-hud-tenue">Este escenario casi no tiene diagnósticos en el horizonte elegido.</p>
+                    <p className="py-10 text-sm text-hud-tenue">Este escenario casi no tiene diagnósticos en el horizonte elegido.</p>
                   )}
                 </Panel>
-                <Panel titulo="Dispersión del diagnóstico" descripcion={`Cuántas trayectorias se diagnostican en cada año · ${resultadoVista.nombre}.`}>
+                <Panel titulo="Figura 5 · Dispersión del diagnóstico" descripcion={`Cuántas trayectorias se diagnostican en cada año. Escenario «${resultadoVista.nombre}».`}>
                   {resultadoVista.tiemposDiagnostico.length > 0 ? (
                     <HistogramaDiagnostico resultado={resultadoVista} color={colorVista} horizonte={resultados.horizonteAnios} />
                   ) : (
-                    <p className="py-10 text-center text-sm text-hud-tenue">Ninguna trayectoria se diagnostica dentro del horizonte.</p>
+                    <p className="py-10 text-sm text-hud-tenue">Ninguna trayectoria se diagnostica dentro del horizonte.</p>
                   )}
                 </Panel>
               </div>
 
-              <Panel
-                titulo="Comparación de trayectorias"
-                acciones={MARCADORES.map((m) => (
-                  <Pestana key={m.clave} activa={marcador === m.clave} onClick={() => setMarcador(m.clave)}>{m.etiqueta}</Pestana>
-                ))}
-              >
+              <Panel titulo="Figura 6 · Comparación de escenarios" acciones={<Pestanas opciones={MARCADORES.map((m) => ({ clave: m.clave, etiqueta: m.etiqueta }))} activa={marcador} onCambio={setMarcador} etiqueta="Variable" />}>
                 <TrajectoryChart resultados={resultados.resultados} marcador={marcador} unidad={MARCADORES.find((m) => m.clave === marcador)?.unidad ?? ""} />
-                <p className="mt-2 text-xs text-hud-tenue">
-                  La línea es la trayectoria mediana de cada escenario; la banda sombreada es el rango donde cae el 80% de las
-                  trayectorias simuladas (percentil 10 a 90).
-                </p>
+                <p className="mt-2 text-xs text-hud-tenue">Línea: mediana de cada escenario. Sombra: percentiles 10 a 90.</p>
               </Panel>
 
               <Panel titulo="Etapa esperada al final del horizonte">
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {resultados.resultados.map((r, i) => (
-                    <div key={r.escenarioId} className="flex items-center gap-3">
-                      <span className="flex w-44 flex-shrink-0 items-center gap-2 truncate text-sm text-hud-texto">
-                        <span className="h-2 w-2 flex-shrink-0 rounded-full" style={{ backgroundColor: PALETA_ESCENARIOS[i % PALETA_ESCENARIOS.length] }} />
-                        <span className="truncate">{r.nombre}</span>
-                      </span>
-                      <div className="flex-1">
-                        <SegmentedBar pct={r.serie[r.serie.length - 1].etapaPct} />
-                      </div>
+                    <div key={r.escenarioId} className="grid grid-cols-[160px_1fr] items-start gap-4">
+                      <span className="flex items-center gap-2 pt-px text-sm text-hud-texto"><Muestra color={paleta[i % paleta.length]} />{r.nombre}</span>
+                      <SegmentedBar pct={r.serie[r.serie.length - 1].etapaPct} />
                     </div>
                   ))}
                 </div>
               </Panel>
 
-              <details className="group rounded-2xl border border-hud-borde bg-hud-panel/80 p-5">
-                <summary className="flex cursor-pointer list-none items-center justify-between text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-300 marker:content-none">
+              <details className="group border-t border-hud-borde-fuerte pt-5">
+                <summary className="cursor-pointer list-none font-serif text-xl font-semibold text-white marker:content-none">
                   Variables aleatorias y supuestos de esta simulación
-                  <ChevronDown size={16} className="text-hud-suave transition-transform group-open:rotate-180" />
+                  <span className="ml-2 text-sm font-normal text-hud-tenue group-open:hidden">mostrar</span>
                 </summary>
-                <div className="mt-4 grid grid-cols-1 gap-5 md:grid-cols-2">
+                <div className="mt-5 grid grid-cols-1 gap-8 md:grid-cols-2">
                   <div>
-                    <h3 className="mb-2 text-xs uppercase tracking-wider text-hud-suave">Variables aleatorias</h3>
-                    <div className="space-y-2">
+                    <h3 className="mb-2 text-sm font-medium text-white">Variables aleatorias</h3>
+                    <ul className="border-t border-hud-borde text-sm">
                       {resultados.supuestos.variablesAleatorias.map((v) => (
-                        <div key={v.simbolo} className="rounded-lg border border-hud-borde bg-hud-fondo/40 p-2.5 text-xs">
-                          <p className="font-semibold text-white">
-                            <span className="font-mono text-hud-acento">{v.simbolo}</span> <span className="font-normal text-hud-suave">· {v.nombre}</span>
-                          </p>
-                          <p className="mt-0.5 text-hud-tenue">{v.distribucion} — {v.parametros}</p>
-                        </div>
+                        <li key={v.simbolo} className="border-b border-hud-borde py-2">
+                          <span className="font-mono text-hud-acento">{v.simbolo}</span> <span className="text-hud-texto">· {v.nombre}</span>
+                          <span className="block text-xs text-hud-tenue">{v.distribucion} — {v.parametros}</span>
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   </div>
                   <div>
-                    <h3 className="mb-2 text-xs uppercase tracking-wider text-hud-suave">Estado inicial del paciente</h3>
-                    <div className="grid grid-cols-2 gap-2 text-center">
+                    <h3 className="mb-2 text-sm font-medium text-white">Estado inicial del paciente</h3>
+                    <dl className="cifras border-t border-hud-borde text-sm">
                       {[
-                        ["S_I0", "sensibilidad inicial", resultadoVista.estadoInicial.sI0],
-                        ["k_VAT", "desgaste adiposo", resultadoVista.estadoInicial.kVat],
-                        ["riesgo_vida", "media sorteada", resultadoVista.estadoInicial.riesgoVida],
-                        ["a_gen", "media sorteada", resultadoVista.estadoInicial.aGen],
-                      ].map(([simbolo, detalle, valor]) => (
-                        <div key={simbolo} className="rounded-lg border border-hud-borde bg-hud-fondo/40 p-2.5">
-                          <p className="font-mono text-[11px] text-hud-acento">{simbolo}</p>
-                          <p className="font-mono text-sm font-bold text-white">{valor}</p>
-                          <p className="text-[10px] text-hud-tenue">{detalle}</p>
+                        ["S_I0 · sensibilidad inicial", resultadoVista.estadoInicial.sI0],
+                        ["k_VAT · desgaste adiposo", resultadoVista.estadoInicial.kVat],
+                        ["riesgo_vida · media sorteada", resultadoVista.estadoInicial.riesgoVida],
+                        ["a_gen · media sorteada", resultadoVista.estadoInicial.aGen],
+                        ["Semilla aleatoria", resultados.semilla],
+                      ].map(([etiqueta, valor]) => (
+                        <div key={etiqueta} className="flex justify-between border-b border-hud-borde py-2">
+                          <dt className="text-hud-suave">{etiqueta}</dt>
+                          <dd className="font-mono text-white">{valor}</dd>
                         </div>
                       ))}
-                    </div>
-                    <h3 className="mb-2 mt-4 text-xs uppercase tracking-wider text-hud-suave">Parámetros fijos del modelo</h3>
-                    <div className="max-h-36 space-y-1 overflow-y-auto pr-1 text-xs">
+                    </dl>
+                    <h3 className="mb-2 mt-6 text-sm font-medium text-white">Parámetros fijos del modelo</h3>
+                    <dl className="cifras max-h-40 overflow-y-auto border-t border-hud-borde text-sm">
                       {Object.entries(resultados.supuestos.parametrosFijos).map(([k, v]) => (
-                        <div key={k} className="flex justify-between gap-2 border-b border-hud-borde/50 py-0.5">
-                          <span className="text-hud-suave">{k}</span>
-                          <span className="font-mono text-white">{v}</span>
+                        <div key={k} className="flex justify-between border-b border-hud-borde py-1.5">
+                          <dt className="text-hud-suave">{k}</dt>
+                          <dd className="font-mono text-white">{v}</dd>
                         </div>
                       ))}
-                    </div>
-                    <p className="mt-3 text-xs text-hud-tenue">Semilla aleatoria de esta corrida: <span className="font-mono text-white">{resultados.semilla}</span></p>
+                    </dl>
                   </div>
                 </div>
-                <p className="mt-4 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-200">
-                  El modelo usa las constantes teóricas de Topp et al. adaptadas en el informe; todavía no se calibró ni validó con
-                  datos locales (SNIS-VE / SEDES La Paz). Los resultados son pronósticos orientativos con incertidumbre, no diagnósticos.
+                <p className="mt-6 border-l-4 border-amber-300 bg-amber-300/10 px-4 py-3 text-sm text-amber-200">
+                  El modelo usa las constantes de Topp et al. adaptadas en el informe y todavía no se validó con datos locales (SNIS-VE / SEDES La Paz).
+                  Los resultados son pronósticos orientativos con incertidumbre, no diagnósticos.
                 </p>
               </details>
             </>

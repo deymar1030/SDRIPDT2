@@ -1,17 +1,16 @@
 import { useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
-import { FileText, KeyRound, Save, ShieldAlert, UserCog } from "lucide-react";
+import { KeyRound, Save, ShieldAlert } from "lucide-react";
 import { Shell } from "../components/Shell";
-import { DoctorBadge } from "../components/DoctorBadge";
-import { Aviso, Boton, Campo, Entrada, Panel } from "../components/ui";
+import { Aviso, Avatar, Boton, Campo, Entrada, Panel } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../api/client";
 import { ROL_ETIQUETA } from "../lib/roles";
 
 const SECCIONES = [
-  { valor: "datos", etiqueta: "Datos personales", icono: UserCog },
-  { valor: "password", etiqueta: "Seguridad", icono: KeyRound },
-  { valor: "terminos", etiqueta: "Términos de uso", icono: FileText },
+  { valor: "datos", etiqueta: "Datos personales" },
+  { valor: "password", etiqueta: "Seguridad" },
+  { valor: "terminos", etiqueta: "Términos de uso" },
 ] as const;
 
 
@@ -169,31 +168,28 @@ export default function Perfil() {
   const seccion = params.get("seccion") ?? "datos";
 
   return (
-    <Shell titulo="Mi perfil">
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[240px_1fr]">
-        <div className="space-y-4">
+    <Shell titulo="Mi perfil" subtitulo="Tus datos de acceso y las condiciones de uso del sistema.">
+      <div className="grid grid-cols-1 gap-x-12 gap-y-8 lg:grid-cols-[220px_1fr]">
+        <div>
           {usuario && (
-            <Panel esquinas>
-              <div className="flex flex-col items-center text-center">
-                <DoctorBadge size={64} />
-                <p className="mt-3 font-semibold text-white">{usuario.nombre}</p>
-                <p className="text-xs text-hud-tenue">{usuario.correo}</p>
-                <span className="mt-2 rounded-full border border-hud-borde-fuerte bg-hud-acento/10 px-2.5 py-0.5 text-xs text-cyan-200">
-                  {ROL_ETIQUETA[usuario.rol] ?? usuario.rol}
-                </span>
+            <div className="mb-6 flex items-center gap-3">
+              <Avatar nombre={usuario.nombre} tamano={48} />
+              <div className="min-w-0">
+                <p className="truncate font-medium text-white">{usuario.nombre}</p>
+                <p className="truncate text-xs text-hud-tenue">{ROL_ETIQUETA[usuario.rol] ?? usuario.rol}</p>
               </div>
-            </Panel>
+            </div>
           )}
-          <nav className="space-y-1 rounded-2xl border border-hud-borde bg-hud-panel/80 p-2">
-            {SECCIONES.map(({ valor, etiqueta, icono: Icono }) => (
+          <nav className="border-l border-hud-borde">
+            {SECCIONES.map(({ valor, etiqueta }) => (
               <button
                 key={valor}
                 onClick={() => setParams({ seccion: valor })}
-                className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${
-                  seccion === valor ? "bg-hud-acento/12 text-white" : "text-hud-suave hover:bg-white/5 hover:text-white"
+                className={`-ml-px block w-full border-l-2 px-4 py-2 text-left text-sm transition-colors ${
+                  seccion === valor ? "border-hud-acento font-medium text-white" : "border-transparent text-hud-suave hover:text-white"
                 }`}
               >
-                <Icono size={16} className={seccion === valor ? "text-hud-acento" : ""} /> {etiqueta}
+                {etiqueta}
               </button>
             ))}
           </nav>

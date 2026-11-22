@@ -1,11 +1,11 @@
 import type { Etapa } from "../types";
-import { tinta } from "./ui";
+import { Muestra } from "./ui";
 
 export const COLOR_ETAPA: Record<Etapa, string> = {
-  sano: "#34d399",
-  resistencia: "#facc15",
-  prediabetes: "#fb923c",
-  diabetes: "#f43f5e",
+  sano: "#2f7d5b",
+  resistencia: "#b7791f",
+  prediabetes: "#c2571a",
+  diabetes: "#b42318",
 };
 
 const NOMBRES: Record<Etapa, string> = {
@@ -16,13 +16,9 @@ const NOMBRES: Record<Etapa, string> = {
 };
 
 export function StageBadge({ etapa, className = "" }: { etapa: Etapa; className?: string }) {
-  const color = COLOR_ETAPA[etapa];
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-semibold ${className}`}
-      style={{ color: tinta(color), borderColor: `${color}55`, backgroundColor: `${color}14` }}
-    >
-      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color, boxShadow: `0 0 6px ${color}` }} />
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-[13px] text-hud-texto ${className}`}>
+      <Muestra color={COLOR_ETAPA[etapa]} />
       {NOMBRES[etapa]}
     </span>
   );

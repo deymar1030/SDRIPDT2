@@ -1,18 +1,10 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Save } from "lucide-react";
 import { Shell } from "../components/Shell";
-import { AreaTexto, Aviso, Boton, BotonEnlace, Campo, Entrada, Panel, tinta } from "../components/ui";
+import { AreaTexto, Aviso, Boton, BotonEnlace, Campo, Entrada, Muestra, Panel } from "../components/ui";
 import { api } from "../api/client";
 import { COLOR_SEDENTARISMO, DETALLE_SEDENTARISMO, NOMBRE_SEDENTARISMO, SEDENTARISMO } from "../lib/perfil";
 import type { Sedentarismo } from "../types";
-
-function colorImc(imc: number) {
-  if (imc < 25) return "#22d3ee";
-  if (imc < 30) return "#facc15";
-  if (imc < 35) return "#fb923c";
-  return "#f43f5e";
-}
 
 function Opcion({ activa, color, titulo, detalle, onClick }: { activa: boolean; color: string; titulo: string; detalle: string; onClick: () => void }) {
   return (
@@ -20,11 +12,10 @@ function Opcion({ activa, color, titulo, detalle, onClick }: { activa: boolean; 
       type="button"
       onClick={onClick}
       aria-pressed={activa}
-      className={`rounded-xl border px-4 py-3 text-left transition-colors ${activa ? "bg-white/5 text-white" : "border-hud-borde text-hud-suave hover:text-white"}`}
-      style={activa ? { borderColor: color, boxShadow: `0 0 14px ${color}33` } : undefined}
+      className={`rounded-md border px-4 py-3 text-left transition-colors ${activa ? "border-hud-acento bg-hud-panel-2 text-white outline outline-1 outline-hud-acento" : "border-hud-borde-fuerte text-hud-suave hover:bg-hud-panel-2"}`}
     >
-      <span className="flex items-center gap-2 text-sm font-semibold">
-        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}` }} />
+      <span className="flex items-center gap-2 text-sm font-medium text-white">
+        <Muestra color={color} />
         {titulo}
       </span>
       <span className="mt-1 block text-xs text-hud-tenue">{detalle}</span>
@@ -68,7 +59,7 @@ export default function PatientNew() {
 
   return (
     <Shell titulo="Registrar paciente" subtitulo="Estas son las cinco entradas del modelo del informe">
-      <form onSubmit={onSubmit} className="mx-auto max-w-3xl space-y-5 pb-24">
+      <form onSubmit={onSubmit} className="max-w-2xl space-y-10 pb-24">
         <Panel titulo="Datos del paciente">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Campo etiqueta="Nombre" htmlFor="nombre" className="sm:col-span-3">
@@ -80,13 +71,9 @@ export default function PatientNew() {
             <Campo etiqueta="IMC" htmlFor="imc" ayuda="Entre 12 y 70 kg/m²">
               <Entrada id="imc" required type="number" step="0.1" min={12} max={70} value={imc} onChange={(e) => setImc(e.target.value)} />
             </Campo>
-            <div className="flex items-end">
-              <div className="flex w-full items-center justify-between rounded-lg border border-hud-borde bg-hud-fondo/50 px-3 py-2">
-                <span className="text-xs uppercase tracking-wider text-hud-suave">Categoría</span>
-                <span className="font-mono text-sm font-bold" style={{ color: imcNumero ? tinta(colorImc(imcNumero)) : "var(--color-hud-tenue)" }}>
-                  {!imcNumero ? "—" : imcNumero < 18.5 ? "Bajo peso" : imcNumero < 25 ? "Normal" : imcNumero < 30 ? "Sobrepeso" : "Obesidad"}
-                </span>
-              </div>
+            <div className="flex items-end pb-2 text-sm">
+              <span className="text-hud-tenue">Categoría:&nbsp;</span>
+              <span className="font-medium text-white">{!imcNumero ? "—" : imcNumero < 18.5 ? "bajo peso" : imcNumero < 25 ? "normal" : imcNumero < 30 ? "sobrepeso" : "obesidad"}</span>
             </div>
           </div>
         </Panel>
@@ -108,8 +95,8 @@ export default function PatientNew() {
 
         <Panel titulo="Antecedentes" descripcion="¿Algún familiar directo tiene diabetes tipo 2?">
           <div className="grid grid-cols-2 gap-3 sm:max-w-sm">
-            <Opcion activa={antecedente} color="#f43f5e" titulo="Sí" detalle="Mayor carga genética" onClick={() => setAntecedente(true)} />
-            <Opcion activa={!antecedente} color="#34d399" titulo="No" detalle="Sin carga genética" onClick={() => setAntecedente(false)} />
+            <Opcion activa={antecedente} color="#b42318" titulo="Sí" detalle="Mayor carga genética" onClick={() => setAntecedente(true)} />
+            <Opcion activa={!antecedente} color="#2f7d5b" titulo="No" detalle="Sin carga genética" onClick={() => setAntecedente(false)} />
           </div>
           <div className="mt-4">
             <Campo etiqueta="Notas clínicas · opcional" htmlFor="notas">
@@ -120,10 +107,10 @@ export default function PatientNew() {
 
         {error && <Aviso tipo="error">{error}</Aviso>}
 
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-hud-borde bg-hud-fondo/90 backdrop-blur lg:left-60">
-          <div className="mx-auto flex max-w-3xl items-center justify-end gap-3 px-4 py-3">
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-hud-borde bg-hud-fondo/95 backdrop-blur">
+          <div className="mx-auto flex max-w-6xl items-center justify-end gap-3 px-4 py-3 sm:px-6">
             <BotonEnlace to="/pacientes" variante="fantasma">Cancelar</BotonEnlace>
-            <Boton type="submit" cargando={cargando} icono={<Save size={16} />}>Registrar paciente</Boton>
+            <Boton type="submit" cargando={cargando}>Registrar paciente</Boton>
           </div>
         </div>
       </form>

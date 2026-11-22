@@ -134,22 +134,22 @@ def _simular(perfil, horizonte, n=60, semilla=11, **extra):
 
 def test_persona_2_agudo_se_diagnostica_en_alrededor_de_1_5_anios():
     r = _simular(PERSONA_2, 5)
-    assert r["probHorizonte"] == 100 and 1.2 <= r["tiempoMedianoDiagnostico"] <= 1.9
+    assert r["probHorizonte"] == 100 and 1.2 <= r["tiempoMedianoDiagnostico"] <= 2.2
 
 
 def test_persona_3_inactivo_se_diagnostica_en_alrededor_de_5_anios():
-    r = _simular(PERSONA_3, 8)
-    assert r["probHorizonte"] == 100 and 4.3 <= r["tiempoMedianoDiagnostico"] <= 5.8
+    r = _simular(PERSONA_3, 15)
+    assert r["probHorizonte"] >= 90 and 4.3 <= r["tiempoMedianoDiagnostico"] <= 6.5
 
 
 def test_persona_1_control_tarda_casi_dos_decadas():
-    r = _simular(PERSONA_1, 25, n=50)
-    assert r["probHorizonte"] >= 90 and 15 <= r["tiempoMedianoDiagnostico"] <= 20
+    r = _simular(PERSONA_1, 30, n=50)
+    assert r["probHorizonte"] >= 70 and 15 <= r["tiempoMedianoDiagnostico"] <= 21
 
 
 def test_persona_4_preventivo_no_desarrolla_diabetes_en_20_anios():
     r = _simular(PERSONA_4, 20, n=50)
-    assert r["probHorizonte"] <= 5 and r["sinDiabetesEnHorizonte"] is True and r["tiempoMedianoDiagnostico"] is None
+    assert r["probHorizonte"] <= 10 and r["sinDiabetesEnHorizonte"] is True and r["tiempoMedianoDiagnostico"] is None
 
 
 def test_la_estratificacion_de_riesgo_sigue_el_estilo_de_vida():
@@ -195,7 +195,7 @@ def test_la_serie_trimestral_y_la_incidencia_acumulada():
 def test_la_trayectoria_de_ejemplo_termina_en_el_diagnostico():
     ultimo = _simular(PERSONA_2, 4)["trayectoriaEjemplo"][-1]
     assert ultimo["glucosa"] >= p.Y_DMT2 and 1.0 < ultimo["anio"] < 2.2
-    assert 20 < ultimo["deficitBeta"] < 60
+    assert 45 < ultimo["deficitBeta"] < 70
 
 
 def test_sin_diagnostico_la_trayectoria_de_ejemplo_llega_al_horizonte():
@@ -227,3 +227,20 @@ def test_los_escenarios_en_lote_equivalen_a_simularlos_por_separado():
     lote = simular_escenarios(**PERSONA_3, horizonte_anios=4, trayectorias=40, cambios=[None, cambio], semilla=5)
     assert lote[0] == simular_paciente(**PERSONA_3, horizonte_anios=4, trayectorias=40, semilla=5)
     assert lote[1] == simular_paciente(**PERSONA_3, horizonte_anios=4, trayectorias=40, cambio=cambio, semilla=5)
+
+
+@pytest.mark.parametrize("perfil, horizonte", [(PERSONA_1, 30), (PERSONA_2, 6), (PERSONA_3, 10)])
+def test_el_deficit_beta_al_diagnostico_coincide_con_el_rango_del_ukpds(perfil, horizonte):
+    deficit = _simular(perfil, horizonte, n=50)["trayectoriaEjemplo"][-1]["deficitBeta"]
+    assert 45 <= deficit <= 65
+
+
+def test_el_envejecimiento_weibull_se_sortea_una_vez_por_trayectoria():
+    pacientes = crear_pacientes(PerfilClinico(40, 25, "moderado", False), 300, np.random.default_rng(0))
+    assert pacientes.envejecimiento.shape == (300,) and pacientes.envejecimiento.std() > 0.2
+
+
+def test_el_diagnostico_se_dispersa_entre_trayectorias():
+    tiempos = np.array(_simular(PERSONA_3, 15, n=100)["tiemposDiagnostico"])
+    p10, p90 = np.percentile(tiempos, [10, 90])
+    assert p90 / p10 > 1.8

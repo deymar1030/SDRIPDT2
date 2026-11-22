@@ -74,7 +74,6 @@ class SimuladorClinico:
         paso = 0
         for tramo in range(len(dias) - 1):
             pasos_tramo = int(dias[tramo + 1] - dias[tramo]) * p.PASOS_POR_DIA
-            weibull = va.envejecimiento_weibull(self.rng, (pasos_tramo, n))
             ruido = va.fluctuacion_metabolica_normal(self.rng, (pasos_tramo, n))
             t_beta = va.variabilidad_apoptosis_gamma(self.rng, (pasos_tramo, n))
 
@@ -84,7 +83,7 @@ class SimuladorClinico:
                     k_vat[s, 0] = tasa_desgaste_adiposo(cambio.sedentarismo, cambio.imc)
                     riesgo_vida[s] = riesgo_estilo_vida(cambio.sedentarismo, pac.u_riesgo_vida)
 
-                x_t = ec.factor_envejecimiento_x_t(weibull[j], paso / total_pasos + edad_frac, riesgo_vida)
+                x_t = ec.factor_envejecimiento_x_t(pac.envejecimiento, paso / total_pasos + edad_frac, riesgo_vida)
                 d_si = ec.ecuacion_1_sensibilidad(k_vat, ruido[j], s_i, x_t)
                 multiplicador = ec.ecuacion_2_glucotoxicidad(g, pac.a_gen, t_beta[j])
                 d_beta = ec.ecuacion_3_masa_beta(beta, g, r_2, multiplicador)

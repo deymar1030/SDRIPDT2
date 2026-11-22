@@ -23,6 +23,7 @@ class PacientesVirtuales:
     u_riesgo_vida: np.ndarray
     riesgo_vida: np.ndarray
     a_gen: np.ndarray
+    envejecimiento: np.ndarray
 
     @property
     def n(self) -> int:
@@ -60,4 +61,5 @@ def crear_pacientes(perfil: PerfilClinico, n: int, rng: np.random.Generator) -> 
         u_riesgo_vida=u_riesgo,
         riesgo_vida=riesgo_estilo_vida(perfil.sedentarismo, u_riesgo),
         a_gen=a_gen,
+        envejecimiento=va.envejecimiento_weibull(rng, n),
     )
