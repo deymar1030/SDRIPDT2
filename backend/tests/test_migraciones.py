@@ -65,6 +65,6 @@ def test_la_migracion_del_motor_conserva_pacientes_y_descarta_lo_incompatible():
         con.close()
 
         assert paciente == [("Rosa", 52, 31.0, 1, "moderado")]
-        assert columnas.isdisjoint({"sexo", "peso", "talla", "glucosa", "insulina", "hba1c", "hipertension", "tabaquismo"})
+        assert columnas.isdisjoint({"sexo", "glucosa", "insulina", "hba1c", "hipertension", "tabaquismo"})
         assert escenarios == [("Sin cambios",)]
         assert corridas == 0

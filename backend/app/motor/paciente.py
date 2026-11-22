@@ -30,6 +30,10 @@ class PacientesVirtuales:
         return self.u_riesgo_vida.shape[0]
 
 
+def calcular_imc(peso_kg: float, talla_cm: float) -> float:
+    return round(peso_kg / (talla_cm / 100) ** 2, 1)
+
+
 def sensibilidad_inicial(imc: float) -> float:
     return max(p.S_I_MINIMA_INICIAL, p.S_I_BASE - (imc - p.IMC_REFERENCIA) * p.S_I_PENDIENTE_IMC)
 

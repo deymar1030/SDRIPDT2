@@ -20,7 +20,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 BACKEND = pathlib.Path(__file__).resolve().parent.parent
 
 PACIENTE_BASE = {
-    "nombre": "Paciente de Prueba", "edad": 50, "imc": 30.9, "sedentarismo": "moderado",
+    "nombre": "Paciente de Prueba", "edad": 50, "peso": 85, "talla": 165, "sedentarismo": "moderado",
     "antecedente_familiar": True, "notas": "Sedentaria.",
 }
 
@@ -71,6 +71,9 @@ def auth(cliente, crear_cuenta):
 @pytest.fixture
 def crear_paciente(cliente, auth):
     def _crear(**cambios):
+        if "imc" in cambios:
+            talla = cambios.setdefault("talla", 170)
+            cambios["peso"] = round(cambios.pop("imc") * (talla / 100) ** 2, 1)
         r = cliente.post("/pacientes", json={**PACIENTE_BASE, **cambios}, headers=auth)
         assert r.status_code == 201, r.text
         return r.json()

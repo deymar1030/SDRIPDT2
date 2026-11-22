@@ -10,7 +10,7 @@ from app.motor import ecuaciones as ec
 from app.motor import indices_clinicos as ic
 from app.motor import variables_aleatorias as va
 from app.motor.escenarios import CambioEstiloVida, resolver_cambio
-from app.motor.paciente import PerfilClinico, crear_pacientes, sensibilidad_inicial, tasa_desgaste_adiposo
+from app.motor.paciente import PerfilClinico, calcular_imc, crear_pacientes, sensibilidad_inicial, tasa_desgaste_adiposo
 
 PERSONA_1 = dict(edad=20, imc=19.0, sedentarismo="moderado", antecedente_familiar=True)
 PERSONA_2 = dict(edad=40, imc=33.5, sedentarismo="severo", antecedente_familiar=True)
@@ -37,6 +37,11 @@ def test_escalar_uniforme_respeta_el_rango():
 
 
 # ============================================================== paciente.py
+def test_el_imc_se_calcula_con_peso_y_talla():
+    assert calcular_imc(80, 180) == 24.7
+    assert calcular_imc(70, 170) == 24.2
+
+
 def test_sensibilidad_inicial_baja_con_el_imc_y_tiene_piso():
     assert sensibilidad_inicial(22.0) == pytest.approx(1.8)
     assert sensibilidad_inicial(32.0) == pytest.approx(1.3)

@@ -28,6 +28,8 @@ export function getToken() {
 const NOMBRES_CAMPO: Record<string, string> = {
   nombre: "El nombre",
   edad: "La edad",
+  peso: "El peso",
+  talla: "La talla",
   imc: "El IMC",
   sedentarismo: "El sedentarismo",
   antecedente_familiar: "El antecedente familiar",

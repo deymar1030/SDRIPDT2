@@ -60,7 +60,8 @@ export interface Paciente {
 export interface NuevoPaciente {
   nombre: string;
   edad: number;
-  imc: number;
+  peso: number;
+  talla: number;
   sedentarismo: Sedentarismo;
   antecedente_familiar: boolean;
   notas?: string;

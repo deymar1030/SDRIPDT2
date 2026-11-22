@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Save } from "lucide-react";
 import { Shell } from "../components/Shell";
@@ -36,14 +36,19 @@ export default function PatientNew() {
   const navigate = useNavigate();
   const [nombre, setNombre] = useState("");
   const [edad, setEdad] = useState("");
-  const [imc, setImc] = useState("");
+  const [peso, setPeso] = useState("");
+  const [talla, setTalla] = useState("");
   const [sedentarismo, setSedentarismo] = useState<Sedentarismo>("moderado");
   const [antecedente, setAntecedente] = useState<boolean>(false);
   const [notas, setNotas] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
 
-  const imcNumero = parseFloat(imc);
+  const imcNumero = useMemo(() => {
+    const p = parseFloat(peso), t = parseFloat(talla);
+    if (!p || !t) return null;
+    return Math.round((p / Math.pow(t / 100, 2)) * 10) / 10;
+  }, [peso, talla]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -53,7 +58,8 @@ export default function PatientNew() {
       const paciente = await api.crearPaciente({
         nombre,
         edad: Number(edad),
-        imc: imcNumero,
+        peso: Number(peso),
+        talla: Number(talla),
         sedentarismo,
         antecedente_familiar: antecedente,
         notas: notas || undefined,
@@ -67,7 +73,7 @@ export default function PatientNew() {
   }
 
   return (
-    <Shell titulo="Registrar paciente" subtitulo="Estas son las cinco entradas del modelo del informe">
+    <Shell titulo="Registrar paciente" subtitulo="El IMC se calcula con el peso y la talla">
       <form onSubmit={onSubmit} className="mx-auto max-w-3xl space-y-5 pb-24">
         <Panel titulo="Datos del paciente">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -77,14 +83,17 @@ export default function PatientNew() {
             <Campo etiqueta="Edad (años)" htmlFor="edad" ayuda="Persona adulta: 18 a 100">
               <Entrada id="edad" required type="number" min={18} max={100} value={edad} onChange={(e) => setEdad(e.target.value)} />
             </Campo>
-            <Campo etiqueta="IMC" htmlFor="imc" ayuda="Entre 12 y 70 kg/m²">
-              <Entrada id="imc" required type="number" step="0.1" min={12} max={70} value={imc} onChange={(e) => setImc(e.target.value)} />
+            <Campo etiqueta="Peso (kg)" htmlFor="peso" ayuda="20 a 300 kg">
+              <Entrada id="peso" required type="number" step="0.1" min={20} max={300} value={peso} onChange={(e) => setPeso(e.target.value)} />
             </Campo>
-            <div className="flex items-end">
+            <Campo etiqueta="Talla (cm)" htmlFor="talla" ayuda="100 a 230 cm">
+              <Entrada id="talla" required type="number" step="0.1" min={100} max={230} value={talla} onChange={(e) => setTalla(e.target.value)} />
+            </Campo>
+            <div className="flex items-start sm:col-span-3">
               <div className="flex w-full items-center justify-between rounded-lg border border-hud-borde bg-hud-fondo/50 px-3 py-2">
-                <span className="text-xs uppercase tracking-wider text-hud-suave">Categoría</span>
+                <span className="text-xs uppercase tracking-wider text-hud-suave">IMC calculado</span>
                 <span className="font-mono text-sm font-bold" style={{ color: imcNumero ? tinta(colorImc(imcNumero)) : "var(--color-hud-tenue)" }}>
-                  {!imcNumero ? "—" : imcNumero < 18.5 ? "Bajo peso" : imcNumero < 25 ? "Normal" : imcNumero < 30 ? "Sobrepeso" : "Obesidad"}
+                  {!imcNumero ? "—" : `${imcNumero} kg/m² · ${imcNumero < 18.5 ? "bajo peso" : imcNumero < 25 ? "normal" : imcNumero < 30 ? "sobrepeso" : "obesidad"}`}
                 </span>
               </div>
             </div>

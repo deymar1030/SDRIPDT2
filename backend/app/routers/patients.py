@@ -7,7 +7,7 @@ from .. import models, schemas
 from ..database import get_db
 from ..motor import calcular_supuestos, sensibilidad_inicial, simular_escenarios, tasa_desgaste_adiposo
 from ..motor.escenarios import resolver_cambio
-from ..motor.paciente import PerfilClinico
+from ..motor.paciente import PerfilClinico, calcular_imc
 from ..security import requiere_medico
 
 router = APIRouter(prefix="/pacientes", tags=["pacientes"])
@@ -78,7 +78,10 @@ def crear_paciente(
     db: Session = Depends(get_db),
     usuario: models.User = Depends(requiere_medico),
 ):
-    paciente = models.Patient(**datos.model_dump(), creado_por_id=usuario.id)
+    imc = calcular_imc(datos.peso, datos.talla)
+    if not 12 <= imc <= 70:
+        raise HTTPException(status_code=422, detail=f"El IMC calculado ({imc}) queda fuera del rango de 12 a 70; revisa el peso y la talla.")
+    paciente = models.Patient(**datos.model_dump(exclude={"peso", "talla"}), imc=imc, creado_por_id=usuario.id)
     db.add(paciente)
     db.commit()
     db.refresh(paciente)
